@@ -8,10 +8,12 @@ on:
   pull_request:
     branches:
       - develop
-      - main
+permissions:
+  contents: read
 
 jobs:
-  build:
+  build_quality:
+    name: Build & Quality
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
