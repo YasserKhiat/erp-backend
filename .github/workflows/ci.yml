@@ -38,6 +38,9 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Test
+        run: npm test
+
   sca_audit:
     name: SCA (npm audit)
     runs-on: ubuntu-latest
