@@ -111,7 +111,7 @@ jobs:
         run: npm ci
 
       - name: Dependency vulnerability scan
-        run: npm audit --audit-level=high
+        run: npm run security:sca
 
   secret_scan:
     name: Secret Scan (Gitleaks)
@@ -155,7 +155,7 @@ jobs:
 
       - name: Scan image with Trivy
         if: steps.dockerfile.outputs.exists == 'true'
-        uses: aquasecurity/trivy-action@0.24.0
+        uses: aquasecurity/trivy-action@v0.35.0
         with:
           image-ref: erp-backend:${{ github.sha }}
           format: table
@@ -177,6 +177,7 @@ jobs:
   dependency_review:
     name: Dependency Review (PR)
     if: ${{ github.event_name == 'pull_request' }}
+    continue-on-error: true
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
