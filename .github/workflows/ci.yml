@@ -1,6 +1,7 @@
 name: CI
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - develop
@@ -72,16 +73,30 @@ jobs:
 
   container_security:
     name: Container Security (Trivy)
-    if: ${{ hashFiles('Dockerfile') != '' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Detect Dockerfile
+        id: dockerfile
+        run: |
+          if [ -f Dockerfile ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Skip container scan when Dockerfile is absent
+        if: steps.dockerfile.outputs.exists != 'true'
+        run: echo "Dockerfile not found. Container scan skipped."
+
       - name: Build Docker image
+        if: steps.dockerfile.outputs.exists == 'true'
         run: docker build -t erp-backend:${{ github.sha }} .
 
       - name: Scan image with Trivy
+        if: steps.dockerfile.outputs.exists == 'true'
         uses: aquasecurity/trivy-action@0.24.0
         with:
           image-ref: erp-backend:${{ github.sha }}
