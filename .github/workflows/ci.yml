@@ -8,6 +8,11 @@ on:
   pull_request:
     branches:
       - develop
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
@@ -15,6 +20,7 @@ jobs:
   build_quality:
     name: Build & Quality
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -40,6 +46,7 @@ jobs:
   feature_validation:
     name: Feature Validation (Runtime + DTO)
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -88,6 +95,7 @@ jobs:
   sca_audit:
     name: SCA (npm audit)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -107,6 +115,7 @@ jobs:
   secret_scan:
     name: Secret Scan (Gitleaks)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -122,6 +131,7 @@ jobs:
     name: Container Security (Trivy)
     if: ${{ hashFiles('Dockerfile') != '' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -142,8 +152,26 @@ jobs:
   dast_readiness:
     name: DAST Readiness (OWASP ZAP placeholder)
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: DAST placeholder
         run: |
           echo "DAST stage is prepared."
           echo "Enable OWASP ZAP baseline scan once a deployable API URL is available."
+
+  dependency_review:
+    name: Dependency Review (PR)
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Dependency review
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
