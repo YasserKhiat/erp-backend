@@ -24,6 +24,10 @@ export class OrdersService {
     return Number(this.configService.get('TAX_RATE', '0.1'));
   }
 
+  private roundMoney(value: number): number {
+    return Math.round(value * 100) / 100;
+  }
+
   private async getOrCreateActiveCart(userId: string) {
     const active = await this.prisma.cart.findFirst({
       where: { userId, isActive: true },
@@ -113,12 +117,14 @@ export class OrdersService {
       throw new BadRequestException('Cart is empty');
     }
 
-    const subtotal = cart.items.reduce(
+    const subtotal = this.roundMoney(
+      cart.items.reduce(
       (acc, item) => acc + Number(item.menuItem.price) * item.quantity,
       0,
+    ),
     );
-    const tax = subtotal * this.getTaxRate();
-    const total = subtotal + tax;
+    const tax = this.roundMoney(subtotal * this.getTaxRate());
+    const total = this.roundMoney(subtotal + tax);
 
     const order = await this.prisma.$transaction(async (tx) => {
       const created = await tx.order.create({
@@ -136,7 +142,9 @@ export class OrdersService {
               menuItemId: item.menuItemId,
               quantity: item.quantity,
               unitPrice: item.menuItem.price,
-              totalPrice: Number(item.menuItem.price) * item.quantity,
+              totalPrice: this.roundMoney(
+                Number(item.menuItem.price) * item.quantity,
+              ),
             })),
           },
         },
