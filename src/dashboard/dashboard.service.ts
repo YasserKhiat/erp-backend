@@ -11,6 +11,7 @@ export class DashboardService {
   async handleOrderCreated(event: OrderCreatedEvent) {
     const now = new Date();
     const day = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const orderTotal = Number(event.order.total);
 
     await this.prisma.dailyStat.upsert({
       where: { date: day },
@@ -19,13 +20,13 @@ export class DashboardService {
           increment: 1,
         },
         totalRevenue: {
-          increment: event.order.total,
+          increment: orderTotal,
         },
       },
       create: {
         date: day,
         totalOrders: 1,
-        totalRevenue: event.order.total,
+        totalRevenue: orderTotal,
       },
     });
   }

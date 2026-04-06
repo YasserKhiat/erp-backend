@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { PaymentStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { PaymentStatus } from '../common/constants/domain-enums';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 
 @Injectable()

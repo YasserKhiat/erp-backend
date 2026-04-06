@@ -1,5 +1,5 @@
-import { OrderType } from '@prisma/client';
 import { IsEnum, IsInt, IsOptional, IsString, Min } from 'class-validator';
+import { OrderType } from '../../common/constants/domain-enums';
 
 export class PlaceOrderDto {
   @IsEnum(OrderType)

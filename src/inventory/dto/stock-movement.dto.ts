@@ -1,6 +1,6 @@
-import { StockMovementType } from '@prisma/client';
 import { Type } from 'class-transformer';
 import { IsEnum, IsNumber, IsOptional, IsString } from 'class-validator';
+import { StockMovementType } from '../../common/constants/domain-enums';
 
 export class StockMovementDto {
   @IsString()

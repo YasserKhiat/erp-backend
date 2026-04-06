@@ -7,10 +7,10 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { UserRole } from '@prisma/client';
 import { Roles } from '../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { UserRole } from '../common/constants/domain-enums';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { CreateMenuItemDto } from './dto/create-menu-item.dto';
 import { MenuService } from './menu.service';

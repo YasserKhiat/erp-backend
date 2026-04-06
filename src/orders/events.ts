@@ -1,7 +1,7 @@
-import { Order } from '@prisma/client';
-
 export interface OrderCreatedEvent {
-  order: Order & {
+  order: {
+    id: string;
+    total: number;
     items: Array<{
       menuItemId: string;
       quantity: number;

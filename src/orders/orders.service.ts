@@ -4,9 +4,9 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { OrderStatus, UserRole } from '@prisma/client';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../prisma/prisma.service';
+import { OrderStatus, UserRole } from '../common/constants/domain-enums';
 import { AddCartItemDto } from './dto/add-cart-item.dto';
 import { PlaceOrderDto } from './dto/place-order.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
@@ -162,7 +162,14 @@ export class OrdersService {
     });
 
     this.eventEmitter.emit('order.created', {
-      order,
+      order: {
+        id: order.id,
+        total: Number(order.total),
+        items: order.items.map((item) => ({
+          menuItemId: item.menuItemId,
+          quantity: item.quantity,
+        })),
+      },
     } as OrderCreatedEvent);
 
     return order;

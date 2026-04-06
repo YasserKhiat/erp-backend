@@ -1,8 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { StockMovementType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { StockMovementType } from '../common/constants/domain-enums';
 import { OrderCreatedEvent } from '../orders/events';
 import { CreateIngredientDto } from './dto/create-ingredient.dto';
 import { StockMovementDto } from './dto/stock-movement.dto';
