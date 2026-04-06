@@ -90,3 +90,12 @@ jobs:
           ignore-unfixed: true
           vuln-type: 'os,library'
           severity: 'CRITICAL'
+
+  dast_readiness:
+    name: DAST Readiness (OWASP ZAP placeholder)
+    runs-on: ubuntu-latest
+    steps:
+      - name: DAST placeholder
+        run: |
+          echo "DAST stage is prepared."
+          echo "Enable OWASP ZAP baseline scan once a deployable API URL is available."
