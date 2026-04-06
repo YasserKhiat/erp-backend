@@ -37,6 +37,54 @@ jobs:
       - name: Build
         run: npm run build
 
+  feature_validation:
+    name: Feature Validation (Runtime + DTO)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma Client
+        run: npm run prisma:generate
+
+      - name: Build for runtime validation
+        run: npm run build
+
+      - name: Start API for smoke checks
+        env:
+          PORT: 3000
+          SKIP_DB_CONNECT: 'true'
+          JWT_SECRET: ci-local-secret
+        run: |
+          npm run start &
+          echo $! > app.pid
+
+      - name: Wait for API startup
+        run: |
+          for i in {1..30}; do
+            curl -fsS http://127.0.0.1:3000/health && break
+            sleep 2
+          done
+
+      - name: Execute smoke tests
+        run: npm run test:smoke
+
+      - name: Stop API
+        if: always()
+        run: |
+          if [ -f app.pid ]; then
+            kill $(cat app.pid) || true
+          fi
+
   sca_audit:
     name: SCA (npm audit)
     runs-on: ubuntu-latest

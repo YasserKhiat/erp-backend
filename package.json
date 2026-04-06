@@ -12,7 +12,9 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
-    "test": "echo \"No tests yet\""
+    "test": "npm run test:validation",
+    "test:validation": "npm run lint && npm run build",
+    "test:smoke": "node scripts/smoke-test.mjs"
   },
   "keywords": [
     "nest",
