@@ -1,6 +1,7 @@
 name: CI
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - develop
@@ -8,6 +9,11 @@ on:
   pull_request:
     branches:
       - develop
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
@@ -15,6 +21,7 @@ jobs:
   build_quality:
     name: Build & Quality
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -37,9 +44,59 @@ jobs:
       - name: Build
         run: npm run build
 
+  feature_validation:
+    name: Feature Validation (Runtime + DTO)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma Client
+        run: npm run prisma:generate
+
+      - name: Build for runtime validation
+        run: npm run build
+
+      - name: Start API for smoke checks
+        env:
+          PORT: 3000
+          SKIP_DB_CONNECT: 'true'
+          JWT_SECRET: ci-local-secret
+        run: |
+          npm run start &
+          echo $! > app.pid
+
+      - name: Wait for API startup
+        run: |
+          for i in {1..30}; do
+            curl -fsS http://127.0.0.1:3000/health && break
+            sleep 2
+          done
+
+      - name: Execute smoke tests
+        run: npm run test:smoke
+
+      - name: Stop API
+        if: always()
+        run: |
+          if [ -f app.pid ]; then
+            kill $(cat app.pid) || true
+          fi
+
   sca_audit:
     name: SCA (npm audit)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -54,11 +111,12 @@ jobs:
         run: npm ci
 
       - name: Dependency vulnerability scan
-        run: npm audit --audit-level=high
+        run: npm run security:sca
 
   secret_scan:
     name: Secret Scan (Gitleaks)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -72,17 +130,32 @@ jobs:
 
   container_security:
     name: Container Security (Trivy)
-    if: ${{ hashFiles('Dockerfile') != '' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Detect Dockerfile
+        id: dockerfile
+        run: |
+          if [ -f Dockerfile ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Skip container scan when Dockerfile is absent
+        if: steps.dockerfile.outputs.exists != 'true'
+        run: echo "Dockerfile not found. Container scan skipped."
+
       - name: Build Docker image
+        if: steps.dockerfile.outputs.exists == 'true'
         run: docker build -t erp-backend:${{ github.sha }} .
 
       - name: Scan image with Trivy
-        uses: aquasecurity/trivy-action@0.24.0
+        if: steps.dockerfile.outputs.exists == 'true'
+        uses: aquasecurity/trivy-action@v0.35.0
         with:
           image-ref: erp-backend:${{ github.sha }}
           format: table
@@ -94,8 +167,26 @@ jobs:
   dast_readiness:
     name: DAST Readiness (OWASP ZAP placeholder)
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: DAST placeholder
         run: |
           echo "DAST stage is prepared."
           echo "Enable OWASP ZAP baseline scan once a deployable API URL is available."
+
+  dependency_review:
+    name: Dependency Review (PR)
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Dependency review
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high

@@ -1,0 +1,4 @@
+# Require repository owner review for workflow and security policy changes
+/.github/workflows/ @YasserKhiat
+/.github/SECURITY.md @YasserKhiat
+/.github/branch-protection.md @YasserKhiat
