@@ -36,3 +36,22 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  sca_audit:
+    name: SCA (npm audit)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Dependency vulnerability scan
+        run: npm audit --audit-level=high
