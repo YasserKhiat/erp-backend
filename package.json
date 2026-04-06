@@ -1,0 +1,62 @@
+{
+  "name": "erp-backend",
+  "version": "1.0.0",
+  "description": "Restaurant ERP backend API",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "nest build",
+    "start": "node dist/main",
+    "start:dev": "nest start --watch",
+    "lint": "eslint \"src/**/*.ts\"",
+    "format": "prettier --write \"{src,prisma}/**/*.{ts,js,json,md,prisma}\"",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:deploy": "prisma migrate deploy",
+    "test": "echo \"No tests yet\""
+  },
+  "keywords": [
+    "nest",
+    "prisma",
+    "restaurant",
+    "erp"
+  ],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@nestjs/common": "^11.1.18",
+    "@nestjs/config": "^4.0.3",
+    "@nestjs/core": "^11.1.18",
+    "@nestjs/event-emitter": "^3.0.1",
+    "@nestjs/jwt": "^11.0.2",
+    "@nestjs/passport": "^11.0.5",
+    "@nestjs/platform-express": "^11.1.18",
+    "@nestjs/swagger": "^11.2.6",
+    "@prisma/client": "^6.16.2",
+    "bcrypt": "^6.0.0",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.14.4",
+    "passport": "^0.7.0",
+    "passport-jwt": "^4.0.1",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2",
+    "swagger-ui-express": "^5.0.1"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "^11.0.17",
+    "@nestjs/schematics": "^11.0.10",
+    "@nestjs/testing": "^11.1.18",
+    "@types/bcrypt": "^6.0.0",
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.5.2",
+    "@types/passport-jwt": "^4.0.1",
+    "@typescript-eslint/eslint-plugin": "^7.18.0",
+    "@typescript-eslint/parser": "^7.18.0",
+    "eslint": "^8.57.0",
+    "prettier": "^3.8.1",
+    "prisma": "^6.16.2",
+    "ts-node": "^10.9.2",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.5.4"
+  }
+}
