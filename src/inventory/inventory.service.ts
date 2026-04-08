@@ -5,6 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { StockMovementType } from '../common/constants/domain-enums';
 import { OrderValidatedEvent } from '../orders/events';
 import { CreateIngredientDto } from './dto/create-ingredient.dto';
+import { StockMovementHistoryQueryDto } from './dto/stock-movement-history-query.dto';
 import { StockMovementDto } from './dto/stock-movement.dto';
 
 @Injectable()
@@ -83,6 +84,29 @@ export class InventoryService {
             Number(item.inventory.currentStock) <= Number(item.minStockLevel),
         ),
       );
+  }
+
+  getStockMovementHistory(filters: StockMovementHistoryQueryDto) {
+    return this.prisma.stockMovement.findMany({
+      where: {
+        ...(filters.ingredientId ? { ingredientId: filters.ingredientId } : {}),
+        ...(filters.type ? { type: filters.type } : {}),
+        ...((filters.from || filters.to)
+          ? {
+              createdAt: {
+                ...(filters.from ? { gte: new Date(filters.from) } : {}),
+                ...(filters.to ? { lte: new Date(filters.to) } : {}),
+              },
+            }
+          : {}),
+      },
+      include: {
+        ingredient: true,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
   }
 
   @OnEvent('order.validated')
