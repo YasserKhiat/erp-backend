@@ -14,6 +14,7 @@ import {
   ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
+import { paginateArray } from '../common/utils/pagination';
 import { Roles } from '../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -37,16 +38,27 @@ export class MenuController {
   @ApiQuery({ name: 'availableOnly', required: false, type: Boolean })
   @ApiQuery({ name: 'categoryId', required: false, type: String })
   @ApiQuery({ name: 'search', required: false, type: String })
+  @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
   getMenu(
     @Query('availableOnly') availableOnly?: string,
     @Query('categoryId') categoryId?: string,
     @Query('search') search?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
   ) {
-    return this.menuService.getMenu({
-      availableOnly: availableOnly === 'true',
-      categoryId,
-      search,
-    });
+    return this.menuService
+      .getMenu({
+        availableOnly: availableOnly === 'true',
+        categoryId,
+        search,
+      })
+      .then((items) =>
+        paginateArray(items, {
+          page: Number(page) || 1,
+          limit: Number(limit) || 10,
+        }),
+      );
   }
 
   @Get('categories')
@@ -60,16 +72,27 @@ export class MenuController {
   @ApiQuery({ name: 'availableOnly', required: false, type: Boolean })
   @ApiQuery({ name: 'categoryId', required: false, type: String })
   @ApiQuery({ name: 'search', required: false, type: String })
+  @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
   getItems(
     @Query('availableOnly') availableOnly?: string,
     @Query('categoryId') categoryId?: string,
     @Query('search') search?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
   ) {
-    return this.menuService.getMenu({
-      availableOnly: availableOnly === 'true',
-      categoryId,
-      search,
-    });
+    return this.menuService
+      .getMenu({
+        availableOnly: availableOnly === 'true',
+        categoryId,
+        search,
+      })
+      .then((items) =>
+        paginateArray(items, {
+          page: Number(page) || 1,
+          limit: Number(limit) || 10,
+        }),
+      );
   }
 
   @Post('categories')
@@ -117,8 +140,21 @@ export class MenuController {
   @Get('formulas')
   @ApiOperation({ summary: 'List formula bundles' })
   @ApiQuery({ name: 'availableOnly', required: false, type: Boolean })
-  getFormulaBundles(@Query('availableOnly') availableOnly?: string) {
-    return this.menuService.getFormulaBundles(availableOnly === 'true');
+  @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
+  getFormulaBundles(
+    @Query('availableOnly') availableOnly?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.menuService
+      .getFormulaBundles(availableOnly === 'true')
+      .then((items) =>
+        paginateArray(items, {
+          page: Number(page) || 1,
+          limit: Number(limit) || 10,
+        }),
+      );
   }
 
   @Get('items/:id/margin')

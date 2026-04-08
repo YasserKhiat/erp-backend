@@ -9,6 +9,8 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
+import { paginateArray } from '../common/utils/pagination';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { UserRole } from '../common/constants/domain-enums';
@@ -40,14 +42,22 @@ export class InventoryController {
 
   @Get()
   @ApiOperation({ summary: 'Get inventory list' })
-  getInventory() {
-    return this.inventoryService.getInventory();
+  @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
+  getInventory(@Query() pagination?: PaginationQueryDto) {
+    return this.inventoryService
+      .getInventory()
+      .then((items) => paginateArray(items, pagination));
   }
 
   @Get('alerts/low-stock')
   @ApiOperation({ summary: 'Get low stock alerts' })
-  getLowStock() {
-    return this.inventoryService.getLowStockItems();
+  @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
+  getLowStock(@Query() pagination?: PaginationQueryDto) {
+    return this.inventoryService
+      .getLowStockItems()
+      .then((items) => paginateArray(items, pagination));
   }
 
   @Get('movements/history')
@@ -56,8 +66,12 @@ export class InventoryController {
   @ApiQuery({ name: 'type', required: false, type: String })
   @ApiQuery({ name: 'from', required: false, type: String })
   @ApiQuery({ name: 'to', required: false, type: String })
+  @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
   getMovementHistory(@Query() query: StockMovementHistoryQueryDto) {
-    return this.inventoryService.getStockMovementHistory(query);
+    return this.inventoryService
+      .getStockMovementHistory(query)
+      .then((items) => paginateArray(items, query));
   }
 
   @Delete('ingredients/:ingredientId')

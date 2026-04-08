@@ -15,6 +15,8 @@ import {
   ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
+import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
+import { paginateArray } from '../common/utils/pagination';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { UserRole } from '../common/constants/domain-enums';
@@ -47,9 +49,16 @@ export class ReservationsController {
 
   @Get('me')
   @ApiOperation({ summary: 'List my reservations' })
+  @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
   @Roles(UserRole.CLIENT)
-  getMyReservations(@CurrentUser() user: { id: string }) {
-    return this.reservationsService.getMyReservations(user.id);
+  getMyReservations(
+    @CurrentUser() user: { id: string },
+    @Query() pagination?: PaginationQueryDto,
+  ) {
+    return this.reservationsService
+      .getMyReservations(user.id)
+      .then((items) => paginateArray(items, pagination));
   }
 
   @Get('availability')
@@ -64,9 +73,13 @@ export class ReservationsController {
 
   @Get()
   @ApiOperation({ summary: 'List reservations (backoffice)' })
+  @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.EMPLOYEE)
   listReservations(@Query() query: ListReservationsQueryDto) {
-    return this.reservationsService.listReservations(query);
+    return this.reservationsService
+      .listReservations(query)
+      .then((items) => paginateArray(items, query));
   }
 
   @Patch(':reservationId')

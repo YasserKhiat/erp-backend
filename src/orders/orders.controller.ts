@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -13,9 +14,12 @@ import {
   ApiBody,
   ApiOkResponse,
   ApiOperation,
+  ApiQuery,
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
+import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
+import { paginateArray } from '../common/utils/pagination';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { UserRole } from '../common/constants/domain-enums';
@@ -71,8 +75,15 @@ export class OrdersController {
   @Get('history')
   @ApiOperation({ summary: 'Get order history of current client' })
   @ApiOkResponse({ description: 'Returns authenticated client order history.' })
-  getHistory(@CurrentUser() user: { id: string }) {
-    return this.ordersService.getOrderHistory(user.id);
+  @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
+  getHistory(
+    @CurrentUser() user: { id: string },
+    @Query() pagination?: PaginationQueryDto,
+  ) {
+    return this.ordersService
+      .getOrderHistory(user.id)
+      .then((items) => paginateArray(items, pagination));
   }
 
   @Get(':orderId')

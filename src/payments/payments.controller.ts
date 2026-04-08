@@ -7,12 +7,20 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiOperation,
+  ApiQuery,
+  ApiTags,
+} from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { UserRole } from '../common/constants/domain-enums';
+import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
+import { paginateArray } from '../common/utils/pagination';
 import { CloseDailyCashDto } from './dto/close-daily-cash.dto';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { CreateMixedPaymentDto } from './dto/create-mixed-payment.dto';
@@ -49,26 +57,42 @@ export class PaymentsController {
 
   @Get()
   @ApiOperation({ summary: 'Payment transaction history' })
+  @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  getTransactions() {
-    return this.paymentsService.getTransactions();
+  getTransactions(@Query() pagination?: PaginationQueryDto) {
+    return this.paymentsService
+      .getTransactions()
+      .then((items) => paginateArray(items, pagination));
   }
 
   @Get('me')
   @ApiOperation({ summary: 'Payment history for current client' })
+  @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
   @Roles(UserRole.CLIENT)
-  getMyTransactions(@CurrentUser() user: { id: string }) {
-    return this.paymentsService.getMyTransactions(user.id);
+  getMyTransactions(
+    @CurrentUser() user: { id: string },
+    @Query() pagination?: PaginationQueryDto,
+  ) {
+    return this.paymentsService
+      .getMyTransactions(user.id)
+      .then((items) => paginateArray(items, pagination));
   }
 
   @Get('order/:orderId')
   @ApiOperation({ summary: 'List payments for one order' })
+  @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
   @Roles(UserRole.CLIENT, UserRole.ADMIN, UserRole.MANAGER, UserRole.EMPLOYEE)
   getOrderPayments(
     @Param('orderId') orderId: string,
     @CurrentUser() user: { id: string; role: UserRole },
+    @Query() pagination?: PaginationQueryDto,
   ) {
-    return this.paymentsService.getOrderPayments(orderId, user);
+    return this.paymentsService
+      .getOrderPayments(orderId, user)
+      .then((payload) => paginateArray(payload.payments, pagination));
   }
 
   @Get('closing/daily')
