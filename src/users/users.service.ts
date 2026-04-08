@@ -208,4 +208,67 @@ export class UsersService {
       orderBy: { createdAt: 'desc' },
     });
   }
+
+  async getInvoiceHistory(userId: string) {
+    return this.prisma.order.findMany({
+      where: {
+        customerId: userId,
+        billNumber: {
+          not: null,
+        },
+      },
+      include: {
+        payments: {
+          orderBy: {
+            createdAt: 'asc',
+          },
+        },
+        items: {
+          include: {
+            menuItem: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+  }
+
+  async getProfileSummary(userId: string) {
+    const [addresses, preferences, favorites, loyalty, lastOrders] =
+      await Promise.all([
+        this.prisma.clientAddress.findMany({
+          where: { userId },
+          orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }],
+        }),
+        this.prisma.clientPreference.findUnique({ where: { userId } }),
+        this.prisma.favoriteMenuItem.findMany({
+          where: { userId },
+          include: {
+            menuItem: true,
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 10,
+        }),
+        this.prisma.loyaltyAccount.findUnique({ where: { userId } }),
+        this.prisma.order.findMany({
+          where: { customerId: userId },
+          include: {
+            payments: true,
+            table: true,
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 10,
+        }),
+      ]);
+
+    return {
+      addresses,
+      preferences,
+      favorites,
+      loyalty,
+      recentOrders: lastOrders,
+    };
+  }
 }

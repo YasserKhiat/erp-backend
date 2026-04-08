@@ -42,6 +42,7 @@ enum OrderType {
 enum PaymentMethod {
   CASH
   CARD
+  TRANSFER
 }
 
 enum PaymentStatus {
@@ -81,6 +82,11 @@ enum LoyaltyTransactionType {
   MANUAL_ADJUSTMENT
 }
 
+enum ExpenseCategory {
+  FIXED
+  VARIABLE
+}
+
 model User {
   id           String     @id @default(cuid())
   email        String     @unique
@@ -103,6 +109,8 @@ model User {
   reviews      Review[]
   loyaltyAccount LoyaltyAccount?
   loyaltyTransactions LoyaltyTransaction[]
+  expenseRecords Expense[]      @relation("ExpensePaidBy")
+  cashClosings  CashClosing[]   @relation("CashClosedBy")
 }
 
 model DiningTable {
@@ -458,6 +466,40 @@ model Payment {
 
   @@index([orderId])
   @@index([createdAt])
+}
+
+model CashClosing {
+  id            String   @id @default(cuid())
+  closedDate    DateTime @unique
+  expectedCash  Decimal  @db.Decimal(10, 2)
+  actualCash    Decimal  @db.Decimal(10, 2)
+  discrepancy   Decimal  @db.Decimal(10, 2)
+  totalRevenue  Decimal  @db.Decimal(10, 2)
+  totalPayments Int
+  closedById    String?
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  closedBy      User?    @relation("CashClosedBy", fields: [closedById], references: [id])
+
+  @@index([closedDate])
+}
+
+model Expense {
+  id          String          @id @default(cuid())
+  title       String
+  category    ExpenseCategory
+  amount      Decimal         @db.Decimal(10, 2)
+  expenseDate DateTime
+  paidById    String?
+  notes       String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  paidBy      User?           @relation("ExpensePaidBy", fields: [paidById], references: [id])
+
+  @@index([expenseDate])
+  @@index([category])
+  @@index([paidById])
 }
 
 model StockMovement {
