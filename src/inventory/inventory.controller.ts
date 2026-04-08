@@ -1,10 +1,11 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { UserRole } from '../common/constants/domain-enums';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CreateIngredientDto } from './dto/create-ingredient.dto';
+import { StockMovementHistoryQueryDto } from './dto/stock-movement-history-query.dto';
 import { StockMovementDto } from './dto/stock-movement.dto';
 import { InventoryService } from './inventory.service';
 
@@ -38,5 +39,15 @@ export class InventoryController {
   @ApiOperation({ summary: 'Get low stock alerts' })
   getLowStock() {
     return this.inventoryService.getLowStockItems();
+  }
+
+  @Get('movements/history')
+  @ApiOperation({ summary: 'Get stock movement history with filters' })
+  @ApiQuery({ name: 'ingredientId', required: false, type: String })
+  @ApiQuery({ name: 'type', required: false, type: String })
+  @ApiQuery({ name: 'from', required: false, type: String })
+  @ApiQuery({ name: 'to', required: false, type: String })
+  getMovementHistory(@Query() query: StockMovementHistoryQueryDto) {
+    return this.inventoryService.getStockMovementHistory(query);
   }
 }
