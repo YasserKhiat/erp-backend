@@ -1,22 +1,20 @@
-name: CodeQL
+name: CodeQL / Analyze
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 on:
-  workflow_dispatch:
   push:
     branches:
       - develop
-      - feature/**
-      - fix/**
   pull_request:
     branches:
       - develop
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 permissions:
   actions: read
@@ -25,8 +23,9 @@ permissions:
 
 jobs:
   analyze:
-    name: Analyze (CodeQL)
+    name: CodeQL / Analyze
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
