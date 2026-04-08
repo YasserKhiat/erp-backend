@@ -1,4 +1,13 @@
-import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -49,5 +58,12 @@ export class InventoryController {
   @ApiQuery({ name: 'to', required: false, type: String })
   getMovementHistory(@Query() query: StockMovementHistoryQueryDto) {
     return this.inventoryService.getStockMovementHistory(query);
+  }
+
+  @Delete('ingredients/:ingredientId')
+  @ApiOperation({ summary: 'Delete ingredient if not used by any recipe' })
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  removeIngredient(@Param('ingredientId') ingredientId: string) {
+    return this.inventoryService.deleteIngredient(ingredientId);
   }
 }

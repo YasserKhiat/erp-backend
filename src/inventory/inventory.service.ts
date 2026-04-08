@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../prisma/prisma.service';
@@ -46,10 +46,15 @@ export class InventoryService {
     const signedQty =
       dto.type === StockMovementType.OUT ? -Math.abs(dto.quantity) : dto.quantity;
 
+    const nextStock = Number(ingredient.inventory.currentStock) + signedQty;
+    if (nextStock < 0) {
+      throw new ConflictException('INSUFFICIENT_STOCK');
+    }
+
     const updatedInventory = await this.prisma.inventory.update({
       where: { ingredientId: dto.ingredientId },
       data: {
-        currentStock: Number(ingredient.inventory.currentStock) + signedQty,
+        currentStock: nextStock,
       },
     });
 
@@ -109,6 +114,33 @@ export class InventoryService {
     });
   }
 
+  async deleteIngredient(ingredientId: string) {
+    const ingredient = await this.prisma.ingredient.findUnique({
+      where: { id: ingredientId },
+      select: { id: true },
+    });
+
+    if (!ingredient) {
+      throw new NotFoundException('Ingredient not found');
+    }
+
+    const recipeUsageCount = await this.prisma.menuItemIngredient.count({
+      where: { ingredientId },
+    });
+
+    if (recipeUsageCount > 0) {
+      throw new ConflictException('RESOURCE_IN_USE');
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.stockMovement.deleteMany({ where: { ingredientId } }),
+      this.prisma.inventory.deleteMany({ where: { ingredientId } }),
+      this.prisma.ingredient.delete({ where: { id: ingredientId } }),
+    ]);
+
+    return { deleted: true, ingredientId };
+  }
+
   @OnEvent('order.validated')
   async handleOrderValidated(event: OrderValidatedEvent) {
     for (const orderItem of event.order.items) {
@@ -125,14 +157,22 @@ export class InventoryService {
         },
       });
 
+      if (recipe.length === 0) {
+        throw new ConflictException('MISSING_RECIPE');
+      }
+
       for (const recipeItem of recipe) {
         const consumeQty = Number(recipeItem.quantityNeeded) * orderItem.quantity;
 
         if (!recipeItem.ingredient.inventory) {
-          continue;
+          throw new ConflictException('INSUFFICIENT_STOCK');
         }
 
         const newStock = Number(recipeItem.ingredient.inventory.currentStock) - consumeQty;
+
+        if (newStock < 0) {
+          throw new ConflictException('INSUFFICIENT_STOCK');
+        }
 
         await this.prisma.inventory.update({
           where: { ingredientId: recipeItem.ingredientId },
