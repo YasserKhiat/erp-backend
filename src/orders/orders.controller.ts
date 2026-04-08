@@ -78,8 +78,11 @@ export class OrdersController {
   @Get(':orderId')
   @ApiOperation({ summary: 'Get order details and tracking status' })
   @ApiOkResponse({ description: 'Returns order details including items and payments.' })
-  getOrder(@Param('orderId') orderId: string) {
-    return this.ordersService.getOrder(orderId);
+  getOrder(
+    @Param('orderId') orderId: string,
+    @CurrentUser() user: { id: string; role: UserRole },
+  ) {
+    return this.ordersService.getOrder(orderId, user);
   }
 
   @Get(':orderId/tracking')

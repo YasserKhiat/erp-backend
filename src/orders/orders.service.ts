@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -61,11 +62,56 @@ export class OrdersService {
     const editableStatuses: OrderStatus[] = [
       OrderStatus.PENDING,
       OrderStatus.CONFIRMED,
-      OrderStatus.PREPARING,
-      OrderStatus.READY,
     ];
 
     return editableStatuses.includes(status);
+  }
+
+  private async validateCartStockAvailability(
+    items: Array<{ menuItemId: string; quantity: number }>,
+  ) {
+    const menuItemIds = [...new Set(items.map((item) => item.menuItemId))];
+    const recipes = await this.prisma.menuItemIngredient.findMany({
+      where: { menuItemId: { in: menuItemIds } },
+      include: {
+        ingredient: {
+          include: {
+            inventory: true,
+          },
+        },
+      },
+    });
+
+    const recipesByMenuItem = new Map<string, typeof recipes>();
+    for (const recipe of recipes) {
+      const list = recipesByMenuItem.get(recipe.menuItemId) ?? [];
+      list.push(recipe);
+      recipesByMenuItem.set(recipe.menuItemId, list);
+    }
+
+    const requiredByIngredient = new Map<string, number>();
+
+    for (const item of items) {
+      const recipeLines = recipesByMenuItem.get(item.menuItemId) ?? [];
+      if (recipeLines.length === 0) {
+        throw new ConflictException('MISSING_RECIPE');
+      }
+
+      for (const line of recipeLines) {
+        const needed = Number(line.quantityNeeded) * item.quantity;
+        const current = requiredByIngredient.get(line.ingredientId) ?? 0;
+        requiredByIngredient.set(line.ingredientId, current + needed);
+      }
+    }
+
+    for (const [ingredientId, needed] of requiredByIngredient.entries()) {
+      const stockLine = recipes.find((line) => line.ingredientId === ingredientId);
+      const currentStock = Number(stockLine?.ingredient.inventory?.currentStock ?? 0);
+
+      if (currentStock < needed) {
+        throw new ConflictException('INSUFFICIENT_STOCK');
+      }
+    }
   }
 
   private async recalculateOrderTotals(
@@ -206,6 +252,13 @@ export class OrdersService {
       throw new BadRequestException('Dine-in orders require tableId');
     }
 
+    await this.validateCartStockAvailability(
+      cart.items.map((item) => ({
+        menuItemId: item.menuItemId,
+        quantity: item.quantity,
+      })),
+    );
+
     if (dto.tableId) {
       const table = await this.prisma.diningTable.findUnique({
         where: { id: dto.tableId },
@@ -297,7 +350,7 @@ export class OrdersService {
     });
   }
 
-  async getOrder(orderId: string) {
+  async getOrder(orderId: string, user?: { id: string; role: UserRole }) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
       include: {
@@ -308,6 +361,10 @@ export class OrdersService {
     });
 
     if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+
+    if (user?.role === UserRole.CLIENT && order.customerId !== user.id) {
       throw new NotFoundException('Order not found');
     }
 
@@ -365,9 +422,7 @@ export class OrdersService {
 
     const nextStatuses = this.getStatusTransitions(existing.status as OrderStatus);
     if (!nextStatuses.includes(dto.status)) {
-      throw new BadRequestException(
-        `Invalid status transition from ${existing.status} to ${dto.status}`,
-      );
+      throw new ConflictException('INVALID_ORDER_STATUS');
     }
 
     const updateData: Prisma.OrderUpdateInput = {
@@ -422,7 +477,7 @@ export class OrdersService {
     }
 
     if (!this.canEditOrderItems(order.status as OrderStatus)) {
-      throw new BadRequestException('Order items cannot be modified at this status');
+      throw new ConflictException('INVALID_ORDER_STATUS');
     }
 
     await this.prisma.$transaction(async (tx) => {
@@ -467,7 +522,7 @@ export class OrdersService {
     }
 
     if (!this.canEditOrderItems(order.status as OrderStatus)) {
-      throw new BadRequestException('Order items cannot be modified at this status');
+      throw new ConflictException('INVALID_ORDER_STATUS');
     }
 
     await this.prisma.$transaction(async (tx) => {
