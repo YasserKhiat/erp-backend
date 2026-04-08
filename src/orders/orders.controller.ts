@@ -7,7 +7,14 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+  ApiUnauthorizedResponse,
+} from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { UserRole } from '../common/constants/domain-enums';
@@ -27,12 +34,16 @@ export class OrdersController {
 
   @Get('cart')
   @ApiOperation({ summary: 'Get active cart' })
+  @ApiOkResponse({ description: 'Returns current active cart with items.' })
+  @ApiUnauthorizedResponse({ description: 'JWT token is missing or invalid.' })
   getCart(@CurrentUser() user: { id: string }) {
     return this.ordersService.getCart(user.id);
   }
 
   @Post('cart/items')
   @ApiOperation({ summary: 'Add item to cart' })
+  @ApiBody({ type: AddCartItemDto })
+  @ApiOkResponse({ description: 'Cart updated with requested item.' })
   addCartItem(@CurrentUser() user: { id: string }, @Body() dto: AddCartItemDto) {
     return this.ordersService.addCartItem(user.id, dto);
   }
@@ -45,6 +56,8 @@ export class OrdersController {
 
   @Post()
   @ApiOperation({ summary: 'Place order from active cart' })
+  @ApiBody({ type: PlaceOrderDto })
+  @ApiOkResponse({ description: 'Order created from active cart.' })
   placeOrder(
     @CurrentUser() user: { id: string; role: UserRole },
     @Body() dto: PlaceOrderDto,
@@ -54,18 +67,22 @@ export class OrdersController {
 
   @Get('history')
   @ApiOperation({ summary: 'Get order history of current client' })
+  @ApiOkResponse({ description: 'Returns authenticated client order history.' })
   getHistory(@CurrentUser() user: { id: string }) {
     return this.ordersService.getOrderHistory(user.id);
   }
 
   @Get(':orderId')
   @ApiOperation({ summary: 'Get order details and tracking status' })
+  @ApiOkResponse({ description: 'Returns order details including items and payments.' })
   getOrder(@Param('orderId') orderId: string) {
     return this.ordersService.getOrder(orderId);
   }
 
   @Patch(':orderId/status')
   @ApiOperation({ summary: 'Update order status (POS/backoffice)' })
+  @ApiBody({ type: UpdateOrderStatusDto })
+  @ApiOkResponse({ description: 'Order status updated successfully.' })
   @UseGuards(RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.EMPLOYEE)
   updateStatus(

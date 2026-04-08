@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { CreateMenuItemDto } from './dto/create-menu-item.dto';
@@ -38,9 +39,36 @@ export class MenuService {
     });
   }
 
-  getMenu(availableOnly = false) {
+  getMenu(filters: {
+    availableOnly?: boolean;
+    categoryId?: string;
+    search?: string;
+  }) {
+    const where: Prisma.MenuItemWhereInput = {
+      ...(filters.availableOnly ? { isAvailable: true } : {}),
+      ...(filters.categoryId ? { categoryId: filters.categoryId } : {}),
+      ...(filters.search
+        ? {
+            OR: [
+              {
+                name: {
+                  contains: filters.search,
+                  mode: 'insensitive',
+                },
+              },
+              {
+                description: {
+                  contains: filters.search,
+                  mode: 'insensitive',
+                },
+              },
+            ],
+          }
+        : {}),
+    };
+
     return this.prisma.menuItem.findMany({
-      where: availableOnly ? { isAvailable: true } : undefined,
+      where,
       include: {
         category: true,
       },
