@@ -16,6 +16,7 @@ import { ReservationsModule } from './reservations/reservations.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { LoyaltyModule } from './loyalty/loyalty.module';
 import { FinanceModule } from './finance/finance.module';
+import { EventsModule } from './events/events.module';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { FinanceModule } from './finance/finance.module';
     FinanceModule,
     PaymentsModule,
     DashboardModule,
+    EventsModule,
   ],
   controllers: [AppController],
 })

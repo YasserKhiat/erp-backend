@@ -1,9 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { OnEvent } from '@nestjs/event-emitter';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { OrderStatus, PaymentStatus } from '../common/constants/domain-enums';
-import { OrderCreatedEvent } from '../orders/events';
 import { DashboardQueryDto } from './dto/dashboard-query.dto';
 
 @Injectable()
@@ -25,30 +23,6 @@ export class DashboardService {
     }
 
     return parsed;
-  }
-
-  @OnEvent('order.created')
-  async handleOrderCreated(event: OrderCreatedEvent) {
-    const now = new Date();
-    const day = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const orderTotal = Number(event.order.total);
-
-    await this.prisma.dailyStat.upsert({
-      where: { date: day },
-      update: {
-        totalOrders: {
-          increment: 1,
-        },
-        totalRevenue: {
-          increment: orderTotal,
-        },
-      },
-      create: {
-        date: day,
-        totalOrders: 1,
-        totalRevenue: orderTotal,
-      },
-    });
   }
 
   async getOverview(query: DashboardQueryDto = {}) {
