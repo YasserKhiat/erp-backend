@@ -3,8 +3,10 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   PaymentMethod,
@@ -15,10 +17,16 @@ import {
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { CloseDailyCashDto } from './dto/close-daily-cash.dto';
 import { CreateMixedPaymentDto } from './dto/create-mixed-payment.dto';
+import { PaymentCompletedEvent } from '../orders/events';
 
 @Injectable()
 export class PaymentsService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(PaymentsService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly eventEmitter: EventEmitter2,
+  ) {}
 
   private roundMoney(value: number): number {
     return Math.round(value * 100) / 100;
@@ -91,6 +99,37 @@ export class PaymentsService {
     }
   }
 
+  private emitPaymentCompletedEvent(payment: {
+    id: string;
+    orderId: string;
+    amount: unknown;
+    method: PaymentMethod;
+    userId: string | null;
+  }, order: {
+    orderNumber: number;
+    total: unknown;
+    customerId: string | null;
+  }, paymentSummary: {
+    paidTotal: number;
+    isFullyPaid: boolean;
+  }) {
+    this.logger.log(`Emitting payment.completed for payment ${payment.id}`);
+    this.eventEmitter.emit('payment.completed', {
+      payment: {
+        id: payment.id,
+        orderId: payment.orderId,
+        orderNumber: order.orderNumber,
+        customerId: order.customerId ?? undefined,
+        amount: Number(payment.amount),
+        paidTotal: paymentSummary.paidTotal,
+        orderTotal: Number(order.total),
+        isFullyPaid: paymentSummary.isFullyPaid,
+        method: payment.method,
+        userId: payment.userId ?? undefined,
+      },
+    } as PaymentCompletedEvent);
+  }
+
   async createPayment(userId: string, dto: CreatePaymentDto) {
     const order = await this.getOrderOrThrow(dto.orderId);
     const paidSoFar = this.paidTotal(order.payments);
@@ -122,6 +161,12 @@ export class PaymentsService {
     });
 
     const newPaidTotal = this.roundMoney(paidSoFar + Number(payment.amount));
+    const isFullyPaid = newPaidTotal >= orderTotal;
+
+    this.emitPaymentCompletedEvent(payment, order, {
+      paidTotal: newPaidTotal,
+      isFullyPaid,
+    });
 
     return {
       payment,
@@ -176,6 +221,15 @@ export class PaymentsService {
         }),
       ),
     );
+
+    let runningTotal = paidSoFar;
+    for (const payment of payments) {
+      runningTotal = this.roundMoney(runningTotal + Number(payment.amount));
+      this.emitPaymentCompletedEvent(payment, order, {
+        paidTotal: runningTotal,
+        isFullyPaid: runningTotal >= orderTotal,
+      });
+    }
 
     const newPaidTotal = this.roundMoney(paidSoFar + mixedTotal);
 

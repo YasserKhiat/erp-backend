@@ -1,15 +1,21 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { OnEvent } from '@nestjs/event-emitter';
+import {
+  ConflictException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../prisma/prisma.service';
 import { StockMovementType } from '../common/constants/domain-enums';
-import { OrderValidatedEvent } from '../orders/events';
+import { OrderConfirmedEvent, StockUpdatedEvent } from '../orders/events';
 import { CreateIngredientDto } from './dto/create-ingredient.dto';
 import { StockMovementHistoryQueryDto } from './dto/stock-movement-history-query.dto';
 import { StockMovementDto } from './dto/stock-movement.dto';
 
 @Injectable()
 export class InventoryService {
+  private readonly logger = new Logger(InventoryService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly eventEmitter: EventEmitter2,
@@ -141,8 +147,9 @@ export class InventoryService {
     return { deleted: true, ingredientId };
   }
 
-  @OnEvent('order.validated')
-  async handleOrderValidated(event: OrderValidatedEvent) {
+  async consumeStockForConfirmedOrder(event: OrderConfirmedEvent) {
+    this.logger.log(`Handling stock consumption for order ${event.order.id}`);
+
     for (const orderItem of event.order.items) {
       const recipe = await this.prisma.menuItemIngredient.findMany({
         where: {
@@ -179,6 +186,15 @@ export class InventoryService {
           data: { currentStock: newStock },
         });
 
+        this.eventEmitter.emit('stock.updated', {
+          ingredientId: recipeItem.ingredientId,
+          orderId: event.order.id,
+          currentStock: newStock,
+        } as StockUpdatedEvent);
+        this.logger.log(
+          `Emitting stock.updated for ingredient ${recipeItem.ingredientId}`,
+        );
+
         await this.prisma.stockMovement.create({
           data: {
             ingredientId: recipeItem.ingredientId,
@@ -204,7 +220,7 @@ export class InventoryService {
     }
 
     if (Number(ingredient.inventory.currentStock) <= Number(ingredient.minStockLevel)) {
-      // Listener-based alerting keeps inventory decoupled from notification channels.
+      this.logger.warn(`Emitting stock.low for ingredient ${ingredientId}`);
       this.eventEmitter.emit('stock.low', {
         ingredientId,
       });

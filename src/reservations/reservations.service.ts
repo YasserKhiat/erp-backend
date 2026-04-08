@@ -2,10 +2,13 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../prisma/prisma.service';
 import { ReservationStatus, UserRole } from '../common/constants/domain-enums';
+import { ReservationCreatedEvent } from '../orders/events';
 import { CreateReservationDto } from './dto/create-reservation.dto';
 import { ListReservationsQueryDto } from './dto/list-reservations-query.dto';
 import { ReservationAvailabilityQueryDto } from './dto/reservation-availability-query.dto';
@@ -14,7 +17,12 @@ import { UpdateReservationStatusDto } from './dto/update-reservation-status.dto'
 
 @Injectable()
 export class ReservationsService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(ReservationsService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly eventEmitter: EventEmitter2,
+  ) {}
 
   private readonly activeStatuses: ReservationStatus[] = [
     ReservationStatus.PENDING,
@@ -135,7 +143,7 @@ export class ReservationsService {
     await this.assertTableCapacity(dto.tableId, dto.guestCount);
     await this.assertNoReservationConflict(dto.tableId, startAt, endAt);
 
-    return this.prisma.reservation.create({
+    const reservation = await this.prisma.reservation.create({
       data: {
         userId: actor.role === UserRole.CLIENT ? actor.id : undefined,
         tableId: dto.tableId,
@@ -150,6 +158,20 @@ export class ReservationsService {
         user: true,
       },
     });
+
+    this.logger.log(`Emitting reservation.created for reservation ${reservation.id}`);
+    this.eventEmitter.emit('reservation.created', {
+      reservation: {
+        id: reservation.id,
+        userId: reservation.userId ?? undefined,
+        tableId: reservation.tableId,
+        guestCount: reservation.guestCount,
+        startAt: reservation.startAt.toISOString(),
+        endAt: reservation.endAt.toISOString(),
+      },
+    } as ReservationCreatedEvent);
+
+    return reservation;
   }
 
   getMyReservations(userId: string) {

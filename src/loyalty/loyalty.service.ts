@@ -2,8 +2,8 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
 } from '@nestjs/common';
-import { OnEvent } from '@nestjs/event-emitter';
 import {
   LoyaltyTransactionType,
   UserRole,
@@ -11,10 +11,12 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { AdjustLoyaltyPointsDto } from './dto/adjust-loyalty-points.dto';
 import { RedeemRewardDto } from './dto/redeem-reward.dto';
-import { OrderCompletedEvent } from '../orders/events';
+import { LoyaltyUpdatedEvent } from '../orders/events';
 
 @Injectable()
 export class LoyaltyService {
+  private readonly logger = new Logger(LoyaltyService.name);
+
   private readonly pointsPerCurrencyUnit = 1;
   private readonly milestoneOrderCount = 5;
   private readonly milestoneBonusPoints = 20;
@@ -139,9 +141,11 @@ export class LoyaltyService {
     });
   }
 
-  @OnEvent('order.completed')
-  async onOrderCompleted(event: OrderCompletedEvent) {
-    const earnReference = `earn:${event.order.id}`;
+  async applyLoyaltyUpdateFromEvent(event: LoyaltyUpdatedEvent) {
+    const earnReference = `earn:${event.loyalty.orderId}`;
+    this.logger.log(
+      `Applying loyalty update for order ${event.loyalty.orderId} and user ${event.loyalty.userId}`,
+    );
 
     await this.prisma.$transaction(async (tx) => {
       const existingEarn = await tx.loyaltyTransaction.findUnique({
@@ -154,12 +158,12 @@ export class LoyaltyService {
       }
 
       const account = await tx.loyaltyAccount.upsert({
-        where: { userId: event.order.customerId },
+        where: { userId: event.loyalty.userId },
         update: {},
-        create: { userId: event.order.customerId },
+        create: { userId: event.loyalty.userId },
       });
 
-      const earned = this.normalizePointsFromTotal(event.order.total);
+      const earned = this.normalizePointsFromTotal(event.loyalty.amount);
       let updated = await tx.loyaltyAccount.update({
         where: { id: account.id },
         data: {
@@ -178,18 +182,18 @@ export class LoyaltyService {
       await tx.loyaltyTransaction.create({
         data: {
           accountId: account.id,
-          userId: event.order.customerId,
-          orderId: event.order.id,
+          userId: event.loyalty.userId,
+          orderId: event.loyalty.orderId,
           type: LoyaltyTransactionType.EARN_ORDER,
           pointsDelta: earned,
           balanceAfter: updated.points,
-          reason: `Points earned from order #${event.order.orderNumber}`,
+          reason: `Points earned from order #${event.loyalty.orderNumber}`,
           referenceKey: earnReference,
         },
       });
 
       if (updated.completedOrders % this.milestoneOrderCount === 0) {
-        const bonusReference = `bonus:${event.order.id}:${updated.completedOrders}`;
+        const bonusReference = `bonus:${event.loyalty.orderId}:${updated.completedOrders}`;
 
         const existingBonus = await tx.loyaltyTransaction.findUnique({
           where: { referenceKey: bonusReference },
@@ -212,8 +216,8 @@ export class LoyaltyService {
           await tx.loyaltyTransaction.create({
             data: {
               accountId: account.id,
-              userId: event.order.customerId,
-              orderId: event.order.id,
+              userId: event.loyalty.userId,
+              orderId: event.loyalty.orderId,
               type: LoyaltyTransactionType.BONUS_MILESTONE,
               pointsDelta: this.milestoneBonusPoints,
               balanceAfter: updated.points,
