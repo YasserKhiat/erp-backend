@@ -6,7 +6,12 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiQuery,
+  ApiTags,
+} from '@nestjs/swagger';
 import { Roles } from '../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -20,6 +25,26 @@ import { MenuService } from './menu.service';
 export class MenuController {
   constructor(private readonly menuService: MenuService) {}
 
+  @Get()
+  @ApiOperation({
+    summary: 'Browse menu items (frontend endpoint)',
+    description: 'Primary frontend menu endpoint with optional filters.',
+  })
+  @ApiQuery({ name: 'availableOnly', required: false, type: Boolean })
+  @ApiQuery({ name: 'categoryId', required: false, type: String })
+  @ApiQuery({ name: 'search', required: false, type: String })
+  getMenu(
+    @Query('availableOnly') availableOnly?: string,
+    @Query('categoryId') categoryId?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.menuService.getMenu({
+      availableOnly: availableOnly === 'true',
+      categoryId,
+      search,
+    });
+  }
+
   @Get('categories')
   @ApiOperation({ summary: 'Browse all categories with menu items' })
   getCategories() {
@@ -27,9 +52,20 @@ export class MenuController {
   }
 
   @Get('items')
-  @ApiOperation({ summary: 'Browse menu items' })
-  getItems(@Query('availableOnly') availableOnly?: string) {
-    return this.menuService.getMenu(availableOnly === 'true');
+  @ApiOperation({ summary: 'Browse menu items (legacy alias)' })
+  @ApiQuery({ name: 'availableOnly', required: false, type: Boolean })
+  @ApiQuery({ name: 'categoryId', required: false, type: String })
+  @ApiQuery({ name: 'search', required: false, type: String })
+  getItems(
+    @Query('availableOnly') availableOnly?: string,
+    @Query('categoryId') categoryId?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.menuService.getMenu({
+      availableOnly: availableOnly === 'true',
+      categoryId,
+      search,
+    });
   }
 
   @Post('categories')
