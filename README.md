@@ -24,6 +24,12 @@ npm run start:dev
 Swagger docs: `/docs`
 Health check: `/health`
 
+Order flow smoke test:
+
+```bash
+API_BASE_URL=http://localhost:3000 npm run test:orders
+```
+
 ## Branching Strategy
 
 - `main`: production
