@@ -82,6 +82,16 @@ export class OrdersController {
     return this.ordersService.getOrder(orderId);
   }
 
+  @Get(':orderId/tracking')
+  @ApiOperation({ summary: 'Track my order status (client endpoint)' })
+  @ApiOkResponse({ description: 'Returns tracking-focused order information.' })
+  trackOrder(
+    @Param('orderId') orderId: string,
+    @CurrentUser() user: { id: string; role: UserRole },
+  ) {
+    return this.ordersService.trackOrder(orderId, user);
+  }
+
   @Patch(':orderId/status')
   @ApiOperation({ summary: 'Update order status (POS/backoffice)' })
   @ApiBody({ type: UpdateOrderStatusDto })

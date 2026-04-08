@@ -115,6 +115,60 @@ async function upsertFormulaBundle({ name, description, price, isAvailable, item
   return bundle;
 }
 
+async function seedClientProfile(clientId, menuItems) {
+  await prisma.clientAddress.deleteMany({ where: { userId: clientId } });
+
+  await prisma.clientAddress.createMany({
+    data: [
+      {
+        userId: clientId,
+        label: 'Home',
+        addressLine: 'Rue Hassan II, Apt 4',
+        city: 'Casablanca',
+        postalCode: '20000',
+        isDefault: true,
+      },
+      {
+        userId: clientId,
+        label: 'Office',
+        addressLine: 'Bd Zerktouni, Tower B',
+        city: 'Casablanca',
+        postalCode: '20100',
+        isDefault: false,
+      },
+    ],
+  });
+
+  await prisma.clientPreference.upsert({
+    where: { userId: clientId },
+    update: {
+      dietaryRestrictions: 'Halal only',
+      allergens: 'Peanuts',
+      preferredDeliveryNotes: 'Call upon arrival',
+      marketingOptIn: true,
+    },
+    create: {
+      userId: clientId,
+      dietaryRestrictions: 'Halal only',
+      allergens: 'Peanuts',
+      preferredDeliveryNotes: 'Call upon arrival',
+      marketingOptIn: true,
+    },
+  });
+
+  await prisma.favoriteMenuItem.deleteMany({ where: { userId: clientId } });
+
+  const topPicks = menuItems.slice(0, 2);
+  if (topPicks.length) {
+    await prisma.favoriteMenuItem.createMany({
+      data: topPicks.map((item) => ({
+        userId: clientId,
+        menuItemId: item.id,
+      })),
+    });
+  }
+}
+
 async function upsertTable({ code, seats, assignedWaiterId }) {
   return prisma.diningTable.upsert({
     where: { code },
@@ -210,6 +264,9 @@ async function main() {
 
   const waiter = await prisma.user.findUnique({
     where: { email: 'employee@restaurant.local' },
+  });
+  const client = await prisma.user.findUnique({
+    where: { email: 'client@restaurant.local' },
   });
 
   console.log('Seeding categories...');
@@ -335,7 +392,27 @@ async function main() {
     ],
   });
 
-  const [users, categories, menuItems, tables, suppliers, ingredients, formulas] =
+  if (client) {
+    await seedClientProfile(client.id, [
+      classicBurger,
+      margherita,
+      orangeJuice,
+      brownie,
+    ]);
+  }
+
+  const [
+    users,
+    categories,
+    menuItems,
+    tables,
+    suppliers,
+    ingredients,
+    formulas,
+    addresses,
+    preferences,
+    favorites,
+  ] =
     await Promise.all([
     prisma.user.count(),
     prisma.category.count(),
@@ -344,10 +421,13 @@ async function main() {
     prisma.supplier.count(),
     prisma.ingredient.count(),
     prisma.formulaBundle.count(),
+    prisma.clientAddress.count(),
+    prisma.clientPreference.count(),
+    prisma.favoriteMenuItem.count(),
   ]);
 
   console.log(
-    `Seed complete: users=${users} categories=${categories} menuItems=${menuItems} tables=${tables} suppliers=${suppliers} ingredients=${ingredients} formulas=${formulas}`,
+    `Seed complete: users=${users} categories=${categories} menuItems=${menuItems} tables=${tables} suppliers=${suppliers} ingredients=${ingredients} formulas=${formulas} addresses=${addresses} preferences=${preferences} favorites=${favorites}`,
   );
 }
 

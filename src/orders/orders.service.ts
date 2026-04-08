@@ -314,6 +314,46 @@ export class OrdersService {
     return order;
   }
 
+  async trackOrder(orderId: string, user: { id: string; role: UserRole }) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        table: true,
+        payments: {
+          orderBy: {
+            createdAt: 'desc',
+          },
+          take: 1,
+        },
+      },
+    });
+
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+
+    if (user.role === UserRole.CLIENT && order.customerId !== user.id) {
+      throw new NotFoundException('Order not found');
+    }
+
+    return {
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+      status: order.status,
+      orderType: order.orderType,
+      createdAt: order.createdAt,
+      updatedAt: order.updatedAt,
+      estimatedTotal: Number(order.total),
+      table: order.table
+        ? {
+            id: order.table.id,
+            code: order.table.code,
+          }
+        : null,
+      latestPaymentStatus: order.payments[0]?.status ?? null,
+    };
+  }
+
   async updateOrderStatus(orderId: string, dto: UpdateOrderStatusDto) {
     const existing = await this.prisma.order.findUnique({
       where: { id: orderId },
