@@ -17,6 +17,7 @@ Backend API for restaurant ERP/POS and client ordering platform.
 ```bash
 npm install
 npm run prisma:generate
+npm run prisma:seed
 npm run build
 npm run start:dev
 ```
