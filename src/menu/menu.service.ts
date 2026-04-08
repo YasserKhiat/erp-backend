@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateFormulaBundleDto } from './dto/create-formula-bundle.dto';
@@ -268,5 +273,41 @@ export class MenuService {
       marginPercent,
       costBreakdown,
     };
+  }
+
+  async deleteMenuItem(menuItemId: string) {
+    const menuItem = await this.prisma.menuItem.findUnique({
+      where: { id: menuItemId },
+      select: { id: true },
+    });
+
+    if (!menuItem) {
+      throw new NotFoundException('Menu item not found');
+    }
+
+    const activeOrderUsage = await this.prisma.orderItem.count({
+      where: {
+        menuItemId,
+        order: {
+          status: {
+            in: ['PENDING', 'CONFIRMED', 'PREPARING', 'READY', 'SERVED', 'BILLED'],
+          },
+        },
+      },
+    });
+
+    if (activeOrderUsage > 0) {
+      throw new ConflictException('RESOURCE_IN_USE');
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.menuItemIngredient.deleteMany({ where: { menuItemId } }),
+      this.prisma.formulaBundleItem.deleteMany({ where: { menuItemId } }),
+      this.prisma.favoriteMenuItem.deleteMany({ where: { menuItemId } }),
+      this.prisma.cartItem.deleteMany({ where: { menuItemId } }),
+      this.prisma.menuItem.delete({ where: { id: menuItemId } }),
+    ]);
+
+    return { deleted: true, menuItemId };
   }
 }

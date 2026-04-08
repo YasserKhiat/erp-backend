@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -115,11 +116,15 @@ export class ProcurementService {
     }
 
     if (order.status === SupplierOrderStatus.RECEIVED) {
-      throw new BadRequestException('Received supplier orders cannot be modified');
+      throw new ConflictException('INVALID_ORDER_STATUS');
     }
 
     if (order.status === SupplierOrderStatus.CANCELLED) {
-      throw new BadRequestException('Cancelled supplier orders cannot be modified');
+      throw new ConflictException('INVALID_ORDER_STATUS');
+    }
+
+    if (order.status === SupplierOrderStatus.DRAFT && dto.status === SupplierOrderStatus.RECEIVED) {
+      throw new ConflictException('INVALID_ORDER_STATUS');
     }
 
     return this.prisma.supplierOrder.update({
@@ -139,11 +144,15 @@ export class ProcurementService {
     }
 
     if (order.status === SupplierOrderStatus.CANCELLED) {
-      throw new BadRequestException('Cancelled supplier orders cannot be received');
+      throw new ConflictException('INVALID_ORDER_STATUS');
     }
 
     if (order.status === SupplierOrderStatus.RECEIVED) {
-      throw new BadRequestException('Supplier order already received');
+      throw new ConflictException('INVALID_ORDER_STATUS');
+    }
+
+    if (order.status !== SupplierOrderStatus.SUBMITTED) {
+      throw new ConflictException('INVALID_ORDER_STATUS');
     }
 
     await this.prisma.$transaction(async (tx) => {
