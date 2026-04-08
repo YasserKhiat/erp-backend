@@ -20,6 +20,11 @@ import { UserRole } from '../common/constants/domain-enums';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
+import {
+  ApiContractErrors,
+  ApiContractListOk,
+  ApiContractOk,
+} from '../common/swagger/api-contract.decorators';
 import { paginateArray } from '../common/utils/pagination';
 import { CloseDailyCashDto } from './dto/close-daily-cash.dto';
 import { CreatePaymentDto } from './dto/create-payment.dto';
@@ -28,6 +33,7 @@ import { PaymentsService } from './payments.service';
 
 @ApiTags('payments')
 @ApiBearerAuth()
+@ApiContractErrors()
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('payments')
 export class PaymentsController {
@@ -36,6 +42,7 @@ export class PaymentsController {
   @Post()
   @ApiOperation({ summary: 'Register payment for an order' })
   @ApiBody({ type: CreatePaymentDto })
+  @ApiContractOk({ description: 'Payment registered.', dataSchema: { type: 'object' } })
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.EMPLOYEE)
   createPayment(
     @CurrentUser() user: { id: string },
@@ -47,6 +54,7 @@ export class PaymentsController {
   @Post('mixed')
   @ApiOperation({ summary: 'Register mixed payment for an order' })
   @ApiBody({ type: CreateMixedPaymentDto })
+  @ApiContractOk({ description: 'Mixed payments registered.', dataSchema: { type: 'object' } })
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.EMPLOYEE)
   createMixedPayment(
     @CurrentUser() user: { id: string },
@@ -59,6 +67,7 @@ export class PaymentsController {
   @ApiOperation({ summary: 'Payment transaction history' })
   @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
   @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
+  @ApiContractListOk({ description: 'Paginated payment transactions history.' })
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   getTransactions(@Query() pagination?: PaginationQueryDto) {
     return this.paymentsService
@@ -70,6 +79,7 @@ export class PaymentsController {
   @ApiOperation({ summary: 'Payment history for current client' })
   @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
   @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
+  @ApiContractListOk({ description: 'Paginated client payment history.' })
   @Roles(UserRole.CLIENT)
   getMyTransactions(
     @CurrentUser() user: { id: string },
@@ -84,6 +94,7 @@ export class PaymentsController {
   @ApiOperation({ summary: 'List payments for one order' })
   @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
   @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
+  @ApiContractListOk({ description: 'Paginated payments list for one order.' })
   @Roles(UserRole.CLIENT, UserRole.ADMIN, UserRole.MANAGER, UserRole.EMPLOYEE)
   getOrderPayments(
     @Param('orderId') orderId: string,
@@ -97,6 +108,7 @@ export class PaymentsController {
 
   @Get('closing/daily')
   @ApiOperation({ summary: 'Daily closing report' })
+  @ApiContractOk({ description: 'Daily closing report.', dataSchema: { type: 'object' } })
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   getDailyClosing(@Query('date') date?: string) {
     return this.paymentsService.getDailyClosing(date);
@@ -105,6 +117,7 @@ export class PaymentsController {
   @Post('closing/daily')
   @ApiOperation({ summary: 'Finalize daily cash closing with discrepancy tracking' })
   @ApiBody({ type: CloseDailyCashDto })
+  @ApiContractOk({ description: 'Daily cash closing finalized.', dataSchema: { type: 'object' } })
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   closeDailyCash(
     @CurrentUser() user: { id: string },
@@ -115,6 +128,7 @@ export class PaymentsController {
 
   @Get('treasury/summary')
   @ApiOperation({ summary: 'Treasury inflow summary for a period' })
+  @ApiContractOk({ description: 'Treasury summary for period.', dataSchema: { type: 'object' } })
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   getTreasurySummary(@Query('from') from?: string, @Query('to') to?: string) {
     return this.paymentsService.getTreasurySummary(from, to);

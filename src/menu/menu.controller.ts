@@ -18,6 +18,11 @@ import { paginateArray } from '../common/utils/pagination';
 import { Roles } from '../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import {
+  ApiContractErrors,
+  ApiContractListOk,
+  ApiContractOk,
+} from '../common/swagger/api-contract.decorators';
 import { UserRole } from '../common/constants/domain-enums';
 import { CreateFormulaBundleDto } from './dto/create-formula-bundle.dto';
 import { CreateCategoryDto } from './dto/create-category.dto';
@@ -26,6 +31,7 @@ import { SetMenuItemRecipeDto } from './dto/set-menu-item-recipe.dto';
 import { MenuService } from './menu.service';
 
 @ApiTags('menu')
+@ApiContractErrors()
 @Controller('menu')
 export class MenuController {
   constructor(private readonly menuService: MenuService) {}
@@ -40,6 +46,7 @@ export class MenuController {
   @ApiQuery({ name: 'search', required: false, type: String })
   @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
   @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
+  @ApiContractListOk({ description: 'Paginated menu items list.' })
   getMenu(
     @Query('availableOnly') availableOnly?: string,
     @Query('categoryId') categoryId?: string,
@@ -63,6 +70,13 @@ export class MenuController {
 
   @Get('categories')
   @ApiOperation({ summary: 'Browse all categories with menu items' })
+  @ApiContractOk({
+    description: 'Categories with nested menu items.',
+    dataSchema: {
+      type: 'array',
+      items: { type: 'object' },
+    },
+  })
   getCategories() {
     return this.menuService.getCategories();
   }
@@ -74,6 +88,7 @@ export class MenuController {
   @ApiQuery({ name: 'search', required: false, type: String })
   @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
   @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
+  @ApiContractListOk({ description: 'Paginated legacy menu items list.' })
   getItems(
     @Query('availableOnly') availableOnly?: string,
     @Query('categoryId') categoryId?: string,
@@ -100,6 +115,7 @@ export class MenuController {
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @ApiContractOk({ description: 'Menu category created.', dataSchema: { type: 'object' } })
   createCategory(@Body() dto: CreateCategoryDto) {
     return this.menuService.createCategory(dto);
   }
@@ -109,6 +125,7 @@ export class MenuController {
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @ApiContractOk({ description: 'Menu item created.', dataSchema: { type: 'object' } })
   createMenuItem(@Body() dto: CreateMenuItemDto) {
     return this.menuService.createMenuItem(dto);
   }
@@ -118,12 +135,14 @@ export class MenuController {
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @ApiContractOk({ description: 'Recipe assigned to menu item.', dataSchema: { type: 'object' } })
   setMenuItemRecipe(@Param('id') id: string, @Body() dto: SetMenuItemRecipeDto) {
     return this.menuService.setMenuItemRecipe(id, dto);
   }
 
   @Get('items/:id/recipe')
   @ApiOperation({ summary: 'Get menu item recipe details' })
+  @ApiContractOk({ description: 'Menu item recipe details.', dataSchema: { type: 'object' } })
   getMenuItemRecipe(@Param('id') id: string) {
     return this.menuService.getMenuItemRecipe(id);
   }
@@ -133,6 +152,7 @@ export class MenuController {
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @ApiContractOk({ description: 'Formula bundle created.', dataSchema: { type: 'object' } })
   createFormulaBundle(@Body() dto: CreateFormulaBundleDto) {
     return this.menuService.createFormulaBundle(dto);
   }
@@ -142,6 +162,7 @@ export class MenuController {
   @ApiQuery({ name: 'availableOnly', required: false, type: Boolean })
   @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
   @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
+  @ApiContractListOk({ description: 'Paginated formula bundles list.' })
   getFormulaBundles(
     @Query('availableOnly') availableOnly?: string,
     @Query('page') page?: string,
@@ -162,6 +183,7 @@ export class MenuController {
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @ApiContractOk({ description: 'Menu item margin details.', dataSchema: { type: 'object' } })
   getMenuItemMargin(@Param('id') id: string) {
     return this.menuService.getMenuItemMargin(id);
   }
@@ -171,6 +193,7 @@ export class MenuController {
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @ApiContractOk({ description: 'Menu item deletion result.', dataSchema: { type: 'object' } })
   removeMenuItem(@Param('id') id: string) {
     return this.menuService.deleteMenuItem(id);
   }

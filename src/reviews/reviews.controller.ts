@@ -14,10 +14,16 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { UserRole } from '../common/constants/domain-enums';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
+import {
+  ApiContractErrors,
+  ApiContractListOk,
+  ApiContractOk,
+} from '../common/swagger/api-contract.decorators';
 import { CreateReviewDto } from './dto/create-review.dto';
 import { ReviewsService } from './reviews.service';
 
 @ApiTags('reviews')
+@ApiContractErrors()
 @Controller('reviews')
 export class ReviewsController {
   constructor(private readonly reviewsService: ReviewsService) {}
@@ -27,6 +33,7 @@ export class ReviewsController {
   @ApiParam({ name: 'menuItemId', type: String })
   @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
   @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
+  @ApiContractListOk({ description: 'Paginated menu item reviews.' })
   getMenuItemReviews(
     @Param('menuItemId') menuItemId: string,
     @Query() pagination?: PaginationQueryDto,
@@ -43,6 +50,7 @@ export class ReviewsController {
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.CLIENT)
+  @ApiContractListOk({ description: 'Paginated current client reviews.' })
   getMyReviews(
     @CurrentUser() user: { id: string },
     @Query() pagination?: PaginationQueryDto,
@@ -58,6 +66,7 @@ export class ReviewsController {
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.CLIENT)
+  @ApiContractOk({ description: 'Review created.', dataSchema: { type: 'object' } })
   createReview(
     @CurrentUser() user: { id: string },
     @Body() dto: CreateReviewDto,
