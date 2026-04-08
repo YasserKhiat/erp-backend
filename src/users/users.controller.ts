@@ -88,6 +88,18 @@ export class UsersController {
     return this.usersService.listFavorites(user.id);
   }
 
+  @Get('invoices')
+  @ApiOperation({ summary: 'List billed orders with payment history' })
+  getInvoices(@CurrentUser() user: { id: string }) {
+    return this.usersService.getInvoiceHistory(user.id);
+  }
+
+  @Get('summary')
+  @ApiOperation({ summary: 'Get frontend-ready client profile summary' })
+  getProfileSummary(@CurrentUser() user: { id: string }) {
+    return this.usersService.getProfileSummary(user.id);
+  }
+
   @Post('favorites')
   @ApiOperation({ summary: 'Add menu item to favorites' })
   @ApiBody({ type: FavoriteMenuItemDto })

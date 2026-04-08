@@ -33,6 +33,7 @@ export type OrderType = (typeof OrderType)[keyof typeof OrderType];
 export const PaymentMethod = {
   CASH: 'CASH',
   CARD: 'CARD',
+  TRANSFER: 'TRANSFER',
 } as const;
 
 export type PaymentMethod = (typeof PaymentMethod)[keyof typeof PaymentMethod];
@@ -95,3 +96,11 @@ export const LoyaltyTransactionType = {
 
 export type LoyaltyTransactionType =
   (typeof LoyaltyTransactionType)[keyof typeof LoyaltyTransactionType];
+
+export const ExpenseCategory = {
+  FIXED: 'FIXED',
+  VARIABLE: 'VARIABLE',
+} as const;
+
+export type ExpenseCategory =
+  (typeof ExpenseCategory)[keyof typeof ExpenseCategory];

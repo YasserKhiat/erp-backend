@@ -15,6 +15,7 @@ import { ProcurementModule } from './procurement/procurement.module';
 import { ReservationsModule } from './reservations/reservations.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { LoyaltyModule } from './loyalty/loyalty.module';
+import { FinanceModule } from './finance/finance.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { LoyaltyModule } from './loyalty/loyalty.module';
     ReservationsModule,
     ReviewsModule,
     LoyaltyModule,
+    FinanceModule,
     PaymentsModule,
     DashboardModule,
   ],

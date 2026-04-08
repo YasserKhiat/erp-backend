@@ -1,8 +1,11 @@
 import bcrypt from 'bcrypt';
 import {
+  ExpenseCategory,
   LoyaltyTransactionType,
   OrderStatus,
   OrderType,
+  PaymentMethod,
+  PaymentStatus,
   PrismaClient,
   UserRole,
 } from '@prisma/client';
@@ -324,6 +327,152 @@ async function seedReviewsAndLoyalty(clientId, menuItemId) {
   });
 }
 
+async function seedPaymentsAndFinance(clientId, managerId, menuItemId) {
+  if (!clientId || !managerId || !menuItemId) {
+    return;
+  }
+
+  let order = await prisma.order.findFirst({
+    where: {
+      customerId: clientId,
+      notes: 'Seeded billed order for payments flow',
+    },
+  });
+
+  if (!order) {
+    const subtotal = 24.5;
+    const tax = 2.45;
+    const total = 26.95;
+
+    order = await prisma.order.create({
+      data: {
+        customerId: clientId,
+        employeeId: managerId,
+        status: OrderStatus.COMPLETED,
+        orderType: OrderType.DINE_IN,
+        notes: 'Seeded billed order for payments flow',
+        subtotal,
+        tax,
+        total,
+        billNumber: 'BILL-SEED-PAYMENT-001',
+        billedAt: new Date(),
+        items: {
+          create: {
+            menuItemId,
+            quantity: 2,
+            unitPrice: 12.25,
+            totalPrice: subtotal,
+          },
+        },
+      },
+    });
+  }
+
+  await prisma.payment.deleteMany({
+    where: {
+      orderId: order.id,
+      transactionRef: {
+        startsWith: 'SEEDPAY-',
+      },
+    },
+  });
+
+  await prisma.payment.createMany({
+    data: [
+      {
+        orderId: order.id,
+        userId: managerId,
+        amount: 10,
+        method: PaymentMethod.CASH,
+        status: PaymentStatus.PAID,
+        transactionRef: 'SEEDPAY-CASH-001',
+      },
+      {
+        orderId: order.id,
+        userId: managerId,
+        amount: 8.95,
+        method: PaymentMethod.CARD,
+        status: PaymentStatus.PAID,
+        transactionRef: 'SEEDPAY-CARD-001',
+      },
+      {
+        orderId: order.id,
+        userId: managerId,
+        amount: 8,
+        method: PaymentMethod.TRANSFER,
+        status: PaymentStatus.PAID,
+        transactionRef: 'SEEDPAY-TRANSFER-001',
+      },
+    ],
+  });
+
+  const now = new Date();
+  const startOfDay = new Date(now);
+  startOfDay.setHours(0, 0, 0, 0);
+
+  await prisma.expense.deleteMany({
+    where: {
+      title: {
+        startsWith: 'Seed Expense',
+      },
+    },
+  });
+
+  await prisma.expense.createMany({
+    data: [
+      {
+        title: 'Seed Expense Rent',
+        category: ExpenseCategory.FIXED,
+        amount: 1200,
+        expenseDate: startOfDay,
+        paidById: managerId,
+        notes: 'Seed fixed charge',
+      },
+      {
+        title: 'Seed Expense Electricity',
+        category: ExpenseCategory.FIXED,
+        amount: 320,
+        expenseDate: startOfDay,
+        paidById: managerId,
+        notes: 'Seed fixed charge',
+      },
+      {
+        title: 'Seed Expense Packaging',
+        category: ExpenseCategory.VARIABLE,
+        amount: 140,
+        expenseDate: startOfDay,
+        paidById: managerId,
+        notes: 'Seed variable charge',
+      },
+    ],
+  });
+
+  await prisma.cashClosing.upsert({
+    where: {
+      closedDate: startOfDay,
+    },
+    update: {
+      expectedCash: 10,
+      actualCash: 9.5,
+      discrepancy: -0.5,
+      totalRevenue: 26.95,
+      totalPayments: 3,
+      closedById: managerId,
+      notes: 'Seed daily closing with discrepancy',
+    },
+    create: {
+      closedDate: startOfDay,
+      expectedCash: 10,
+      actualCash: 9.5,
+      discrepancy: -0.5,
+      totalRevenue: 26.95,
+      totalPayments: 3,
+      closedById: managerId,
+      notes: 'Seed daily closing with discrepancy',
+    },
+  });
+}
+
 async function upsertTable({ code, seats, assignedWaiterId }) {
   return prisma.diningTable.upsert({
     where: { code },
@@ -419,6 +568,9 @@ async function main() {
 
   const waiter = await prisma.user.findUnique({
     where: { email: 'employee@restaurant.local' },
+  });
+  const manager = await prisma.user.findUnique({
+    where: { email: 'manager@restaurant.local' },
   });
   const client = await prisma.user.findUnique({
     where: { email: 'client@restaurant.local' },
@@ -556,6 +708,7 @@ async function main() {
     ]);
     await seedReservations(client.id);
     await seedReviewsAndLoyalty(client.id, classicBurger.id);
+    await seedPaymentsAndFinance(client.id, manager?.id, margherita.id);
   }
 
   const [
@@ -573,6 +726,9 @@ async function main() {
     reviews,
     loyaltyAccounts,
     loyaltyTransactions,
+    payments,
+    expenses,
+    cashClosings,
   ] =
     await Promise.all([
     prisma.user.count(),
@@ -589,10 +745,13 @@ async function main() {
     prisma.review.count(),
     prisma.loyaltyAccount.count(),
     prisma.loyaltyTransaction.count(),
+    prisma.payment.count(),
+    prisma.expense.count(),
+    prisma.cashClosing.count(),
   ]);
 
   console.log(
-    `Seed complete: users=${users} categories=${categories} menuItems=${menuItems} tables=${tables} suppliers=${suppliers} ingredients=${ingredients} formulas=${formulas} addresses=${addresses} preferences=${preferences} favorites=${favorites} reservations=${reservations} reviews=${reviews} loyaltyAccounts=${loyaltyAccounts} loyaltyTransactions=${loyaltyTransactions}`,
+    `Seed complete: users=${users} categories=${categories} menuItems=${menuItems} tables=${tables} suppliers=${suppliers} ingredients=${ingredients} formulas=${formulas} addresses=${addresses} preferences=${preferences} favorites=${favorites} reservations=${reservations} reviews=${reviews} loyaltyAccounts=${loyaltyAccounts} loyaltyTransactions=${loyaltyTransactions} payments=${payments} expenses=${expenses} cashClosings=${cashClosings}`,
   );
 }
 
