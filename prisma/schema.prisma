@@ -19,10 +19,18 @@ enum OrderStatus {
   CONFIRMED
   PREPARING
   READY
+  SERVED
+  BILLED
   OUT_FOR_DELIVERY
   DELIVERED
   COMPLETED
   CANCELLED
+}
+
+enum TableStatus {
+  AVAILABLE
+  OCCUPIED
+  RESERVED
 }
 
 enum OrderType {
@@ -34,6 +42,7 @@ enum OrderType {
 enum PaymentMethod {
   CASH
   CARD
+  TRANSFER
 }
 
 enum PaymentStatus {
@@ -49,6 +58,35 @@ enum StockMovementType {
   ADJUSTMENT
 }
 
+enum SupplierOrderStatus {
+  DRAFT
+  SUBMITTED
+  PARTIALLY_RECEIVED
+  RECEIVED
+  CANCELLED
+}
+
+enum ReservationStatus {
+  PENDING
+  CONFIRMED
+  SEATED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum LoyaltyTransactionType {
+  EARN_ORDER
+  BONUS_MILESTONE
+  REDEEM_REWARD
+  MANUAL_ADJUSTMENT
+}
+
+enum ExpenseCategory {
+  FIXED
+  VARIABLE
+}
+
 model User {
   id           String     @id @default(cuid())
   email        String     @unique
@@ -61,8 +99,54 @@ model User {
   updatedAt    DateTime   @updatedAt
   customerOrders Order[]  @relation("CustomerOrders")
   employeeOrders Order[]  @relation("EmployeeOrders")
+  assignedTables DiningTable[] @relation("TableAssignedWaiter")
   carts        Cart[]
   payments     Payment[]
+  addresses    ClientAddress[]
+  preference   ClientPreference?
+  favorites    FavoriteMenuItem[]
+  reservations Reservation[]
+  reviews      Review[]
+  loyaltyAccount LoyaltyAccount?
+  loyaltyTransactions LoyaltyTransaction[]
+  expenseRecords Expense[]      @relation("ExpensePaidBy")
+  cashClosings  CashClosing[]   @relation("CashClosedBy")
+}
+
+model DiningTable {
+  id               String      @id @default(cuid())
+  code             String      @unique
+  seats            Int
+  status           TableStatus @default(AVAILABLE)
+  assignedWaiterId String?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  assignedWaiter   User?       @relation("TableAssignedWaiter", fields: [assignedWaiterId], references: [id])
+  orders           Order[]
+  reservations     Reservation[]
+
+  @@index([status])
+  @@index([assignedWaiterId])
+}
+
+model Reservation {
+  id         String            @id @default(cuid())
+  userId     String?
+  tableId    String
+  guestCount Int
+  startAt    DateTime
+  endAt      DateTime
+  status     ReservationStatus @default(PENDING)
+  notes      String?
+  cancelledAt DateTime?
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+  user       User?             @relation(fields: [userId], references: [id])
+  table      DiningTable       @relation(fields: [tableId], references: [id])
+
+  @@index([tableId, startAt, endAt])
+  @@index([userId])
+  @@index([status])
 }
 
 model Category {
@@ -85,9 +169,78 @@ model MenuItem {
   category     Category            @relation(fields: [categoryId], references: [id])
   orderItems   OrderItem[]
   ingredients  MenuItemIngredient[]
+  formulaItems FormulaBundleItem[]
   cartItems    CartItem[]
+  favorites    FavoriteMenuItem[]
+  reviews      Review[]
 
   @@index([categoryId])
+}
+
+model ClientAddress {
+  id          String   @id @default(cuid())
+  userId      String
+  label       String
+  addressLine String
+  city        String
+  postalCode  String?
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
+model ClientPreference {
+  id                     String   @id @default(cuid())
+  userId                 String   @unique
+  dietaryRestrictions    String?
+  allergens              String?
+  preferredDeliveryNotes String?
+  marketingOptIn         Boolean  @default(false)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+  user                   User     @relation(fields: [userId], references: [id])
+}
+
+model FavoriteMenuItem {
+  id         String   @id @default(cuid())
+  userId     String
+  menuItemId String
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id])
+  menuItem   MenuItem @relation(fields: [menuItemId], references: [id])
+
+  @@unique([userId, menuItemId])
+  @@index([userId])
+  @@index([menuItemId])
+}
+
+model FormulaBundle {
+  id          String              @id @default(cuid())
+  name        String              @unique
+  description String?
+  price       Decimal             @db.Decimal(10, 2)
+  isAvailable Boolean             @default(true)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  items       FormulaBundleItem[]
+
+  @@index([isAvailable])
+}
+
+model FormulaBundleItem {
+  id            String        @id @default(cuid())
+  bundleId      String
+  menuItemId    String
+  quantity      Int           @default(1)
+  formulaBundle FormulaBundle @relation(fields: [bundleId], references: [id])
+  menuItem      MenuItem      @relation(fields: [menuItemId], references: [id])
+
+  @@unique([bundleId, menuItemId])
+  @@index([bundleId])
+  @@index([menuItemId])
 }
 
 model Ingredient {
@@ -95,11 +248,62 @@ model Ingredient {
   name            String              @unique
   unit            String
   minStockLevel   Decimal             @db.Decimal(10, 2)
+  defaultSupplierId String?
   createdAt       DateTime            @default(now())
   updatedAt       DateTime            @updatedAt
+  defaultSupplier Supplier?           @relation(fields: [defaultSupplierId], references: [id])
   inventory       Inventory?
   menuItems       MenuItemIngredient[]
   stockMovements  StockMovement[]
+  supplierOrderItems SupplierOrderItem[]
+}
+
+model Supplier {
+  id          String          @id @default(cuid())
+  name        String
+  email       String?
+  phone       String?
+  address     String?
+  isActive    Boolean         @default(true)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  ingredients Ingredient[]
+  orders      SupplierOrder[]
+
+  @@unique([name])
+}
+
+model SupplierOrder {
+  id           String              @id @default(cuid())
+  supplierId   String
+  status       SupplierOrderStatus @default(DRAFT)
+  notes        String?
+  orderedAt    DateTime            @default(now())
+  receivedAt   DateTime?
+  totalAmount  Decimal             @db.Decimal(12, 2) @default(0)
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+  supplier     Supplier            @relation(fields: [supplierId], references: [id])
+  items        SupplierOrderItem[]
+
+  @@index([supplierId])
+  @@index([status])
+}
+
+model SupplierOrderItem {
+  id               String        @id @default(cuid())
+  supplierOrderId  String
+  ingredientId     String
+  quantity         Decimal       @db.Decimal(10, 2)
+  unitCost         Decimal       @db.Decimal(10, 2)
+  lineTotal        Decimal       @db.Decimal(12, 2)
+  createdAt        DateTime      @default(now())
+  supplierOrder    SupplierOrder @relation(fields: [supplierOrderId], references: [id])
+  ingredient       Ingredient    @relation(fields: [ingredientId], references: [id])
+
+  @@unique([supplierOrderId, ingredientId])
+  @@index([supplierOrderId])
+  @@index([ingredientId])
 }
 
 model Inventory {
@@ -128,7 +332,10 @@ model Order {
   status       OrderStatus  @default(PENDING)
   orderType    OrderType
   tableNumber  Int?
+  tableId      String?
   notes        String?
+  billNumber   String?      @unique
+  billedAt     DateTime?
   subtotal     Decimal      @db.Decimal(10, 2)
   tax          Decimal      @db.Decimal(10, 2)
   total        Decimal      @db.Decimal(10, 2)
@@ -136,11 +343,15 @@ model Order {
   updatedAt    DateTime     @updatedAt
   customer     User?        @relation("CustomerOrders", fields: [customerId], references: [id])
   employee     User?        @relation("EmployeeOrders", fields: [employeeId], references: [id])
+  table        DiningTable? @relation(fields: [tableId], references: [id])
   items        OrderItem[]
   payments     Payment[]
+  reviews      Review[]
+  loyaltyTransactions LoyaltyTransaction[]
 
   @@index([customerId])
   @@index([employeeId])
+  @@index([tableId])
   @@index([status])
 }
 
@@ -179,9 +390,65 @@ model OrderItem {
   totalPrice  Decimal   @db.Decimal(10, 2)
   order       Order     @relation(fields: [orderId], references: [id])
   menuItem    MenuItem  @relation(fields: [menuItemId], references: [id])
+  reviews     Review[]
 
   @@index([orderId])
   @@index([menuItemId])
+}
+
+model Review {
+  id          String   @id @default(cuid())
+  userId      String
+  orderId     String
+  orderItemId String
+  menuItemId  String
+  rating      Int
+  comment     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id])
+  order       Order    @relation(fields: [orderId], references: [id])
+  orderItem   OrderItem @relation(fields: [orderItemId], references: [id])
+  menuItem    MenuItem @relation(fields: [menuItemId], references: [id])
+
+  @@unique([userId, orderItemId])
+  @@index([menuItemId, createdAt])
+  @@index([orderId])
+  @@index([userId])
+}
+
+model LoyaltyAccount {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  points          Int      @default(0)
+  lifetimePoints  Int      @default(0)
+  completedOrders Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  user            User     @relation(fields: [userId], references: [id])
+  transactions    LoyaltyTransaction[]
+
+  @@index([points])
+}
+
+model LoyaltyTransaction {
+  id           String                 @id @default(cuid())
+  accountId    String
+  userId       String
+  orderId      String?
+  type         LoyaltyTransactionType
+  pointsDelta  Int
+  balanceAfter Int
+  reason       String?
+  referenceKey String?                @unique
+  createdAt    DateTime               @default(now())
+  account      LoyaltyAccount         @relation(fields: [accountId], references: [id])
+  user         User                   @relation(fields: [userId], references: [id])
+  order        Order?                 @relation(fields: [orderId], references: [id])
+
+  @@index([accountId, createdAt])
+  @@index([userId, createdAt])
+  @@index([orderId])
 }
 
 model Payment {
@@ -199,6 +466,40 @@ model Payment {
 
   @@index([orderId])
   @@index([createdAt])
+}
+
+model CashClosing {
+  id            String   @id @default(cuid())
+  closedDate    DateTime @unique
+  expectedCash  Decimal  @db.Decimal(10, 2)
+  actualCash    Decimal  @db.Decimal(10, 2)
+  discrepancy   Decimal  @db.Decimal(10, 2)
+  totalRevenue  Decimal  @db.Decimal(10, 2)
+  totalPayments Int
+  closedById    String?
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  closedBy      User?    @relation("CashClosedBy", fields: [closedById], references: [id])
+
+  @@index([closedDate])
+}
+
+model Expense {
+  id          String          @id @default(cuid())
+  title       String
+  category    ExpenseCategory
+  amount      Decimal         @db.Decimal(10, 2)
+  expenseDate DateTime
+  paidById    String?
+  notes       String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  paidBy      User?           @relation("ExpensePaidBy", fields: [paidById], references: [id])
+
+  @@index([expenseDate])
+  @@index([category])
+  @@index([paidById])
 }
 
 model StockMovement {
