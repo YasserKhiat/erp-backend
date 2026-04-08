@@ -2,6 +2,8 @@ import {
   Body,
   Controller,
   Get,
+  Param,
+  Patch,
   Post,
   Query,
   UseGuards,
@@ -13,6 +15,7 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { UserRole } from '../common/constants/domain-enums';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { CreateMenuItemDto } from './dto/create-menu-item.dto';
+import { UpdateMenuAvailabilityDto } from './dto/update-menu-availability.dto';
 import { MenuService } from './menu.service';
 
 @ApiTags('menu')
@@ -28,8 +31,22 @@ export class MenuController {
 
   @Get('items')
   @ApiOperation({ summary: 'Browse menu items' })
-  getItems(@Query('availableOnly') availableOnly?: string) {
-    return this.menuService.getMenu(availableOnly === 'true');
+  getItems(
+    @Query('availableOnly') availableOnly?: string,
+    @Query('categoryId') categoryId?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.menuService.getMenu({
+      availableOnly: availableOnly === 'true',
+      categoryId,
+      search,
+    });
+  }
+
+  @Get('items/:itemId')
+  @ApiOperation({ summary: 'Get menu item details' })
+  getItem(@Param('itemId') itemId: string) {
+    return this.menuService.getMenuItemById(itemId);
   }
 
   @Post('categories')
@@ -48,5 +65,17 @@ export class MenuController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   createMenuItem(@Body() dto: CreateMenuItemDto) {
     return this.menuService.createMenuItem(dto);
+  }
+
+  @Patch('items/:itemId/availability')
+  @ApiOperation({ summary: 'Update menu item availability' })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  updateAvailability(
+    @Param('itemId') itemId: string,
+    @Body() dto: UpdateMenuAvailabilityDto,
+  ) {
+    return this.menuService.updateAvailability(itemId, dto);
   }
 }
