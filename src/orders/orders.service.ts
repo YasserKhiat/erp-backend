@@ -19,7 +19,11 @@ import { PlaceOrderDto } from './dto/place-order.dto';
 import { RemoveOrderItemDto } from './dto/remove-order-item.dto';
 import { UpdateOrderItemDto } from './dto/update-order-item.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
-import { OrderCreatedEvent, OrderValidatedEvent } from './events';
+import {
+  OrderCompletedEvent,
+  OrderCreatedEvent,
+  OrderValidatedEvent,
+} from './events';
 
 @Injectable()
 export class OrdersService {
@@ -155,6 +159,22 @@ export class OrdersService {
           menuItemId: item.menuItemId,
           quantity: item.quantity,
         })),
+      },
+    };
+  }
+
+  private buildOrderCompletedEventPayload(order: {
+    id: string;
+    total: Prisma.Decimal;
+    customerId: string;
+    orderNumber: number;
+  }): OrderCompletedEvent {
+    return {
+      order: {
+        id: order.id,
+        total: Number(order.total),
+        customerId: order.customerId,
+        orderNumber: order.orderNumber,
       },
     };
   }
@@ -460,6 +480,18 @@ export class OrdersService {
       this.eventEmitter.emit(
         'order.validated',
         this.buildOrderEventPayload(updated) as OrderValidatedEvent,
+      );
+    }
+
+    if (dto.status === OrderStatus.COMPLETED && updated.customerId) {
+      this.eventEmitter.emit(
+        'order.completed',
+        this.buildOrderCompletedEventPayload({
+          id: updated.id,
+          total: updated.total,
+          customerId: updated.customerId,
+          orderNumber: updated.orderNumber,
+        }) as OrderCompletedEvent,
       );
     }
 

@@ -1,5 +1,11 @@
 import bcrypt from 'bcrypt';
-import { PrismaClient, UserRole } from '@prisma/client';
+import {
+  LoyaltyTransactionType,
+  OrderStatus,
+  OrderType,
+  PrismaClient,
+  UserRole,
+} from '@prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -201,6 +207,120 @@ async function seedReservations(clientId) {
       status: 'CONFIRMED',
       notes: 'Seeded reservation for validation',
     },
+  });
+}
+
+async function seedReviewsAndLoyalty(clientId, menuItemId) {
+  if (!clientId || !menuItemId) {
+    return;
+  }
+
+  let order = await prisma.order.findFirst({
+    where: {
+      customerId: clientId,
+      notes: 'Seeded completed order for review flow',
+    },
+    include: {
+      items: true,
+    },
+  });
+
+  if (!order) {
+    const subtotal = 8.9;
+    const tax = 0.89;
+    const total = 9.79;
+
+    order = await prisma.order.create({
+      data: {
+        customerId: clientId,
+        status: OrderStatus.COMPLETED,
+        orderType: OrderType.TAKEAWAY,
+        notes: 'Seeded completed order for review flow',
+        subtotal,
+        tax,
+        total,
+        items: {
+          create: {
+            menuItemId,
+            quantity: 1,
+            unitPrice: subtotal,
+            totalPrice: subtotal,
+          },
+        },
+      },
+      include: {
+        items: true,
+      },
+    });
+  }
+
+  const targetItem = order.items.find((item) => item.menuItemId === menuItemId);
+  if (!targetItem) {
+    return;
+  }
+
+  await prisma.review.upsert({
+    where: {
+      userId_orderItemId: {
+        userId: clientId,
+        orderItemId: targetItem.id,
+      },
+    },
+    update: {
+      rating: 5,
+      comment: 'Seeded review for loyalty and ratings demo.',
+      orderId: order.id,
+      menuItemId,
+    },
+    create: {
+      userId: clientId,
+      orderId: order.id,
+      orderItemId: targetItem.id,
+      menuItemId,
+      rating: 5,
+      comment: 'Seeded review for loyalty and ratings demo.',
+    },
+  });
+
+  const account = await prisma.loyaltyAccount.upsert({
+    where: { userId: clientId },
+    update: {
+      points: 140,
+      lifetimePoints: 170,
+      completedOrders: 5,
+    },
+    create: {
+      userId: clientId,
+      points: 140,
+      lifetimePoints: 170,
+      completedOrders: 5,
+    },
+  });
+
+  await prisma.loyaltyTransaction.createMany({
+    data: [
+      {
+        accountId: account.id,
+        userId: clientId,
+        orderId: order.id,
+        type: LoyaltyTransactionType.EARN_ORDER,
+        pointsDelta: 10,
+        balanceAfter: 120,
+        reason: 'Seed: points from completed order',
+        referenceKey: `seed:earn:${order.id}`,
+      },
+      {
+        accountId: account.id,
+        userId: clientId,
+        orderId: order.id,
+        type: LoyaltyTransactionType.BONUS_MILESTONE,
+        pointsDelta: 20,
+        balanceAfter: 140,
+        reason: 'Seed: milestone bonus',
+        referenceKey: `seed:bonus:${order.id}`,
+      },
+    ],
+    skipDuplicates: true,
   });
 }
 
@@ -435,6 +555,7 @@ async function main() {
       brownie,
     ]);
     await seedReservations(client.id);
+    await seedReviewsAndLoyalty(client.id, classicBurger.id);
   }
 
   const [
@@ -449,6 +570,9 @@ async function main() {
     preferences,
     favorites,
     reservations,
+    reviews,
+    loyaltyAccounts,
+    loyaltyTransactions,
   ] =
     await Promise.all([
     prisma.user.count(),
@@ -462,10 +586,13 @@ async function main() {
     prisma.clientPreference.count(),
     prisma.favoriteMenuItem.count(),
     prisma.reservation.count(),
+    prisma.review.count(),
+    prisma.loyaltyAccount.count(),
+    prisma.loyaltyTransaction.count(),
   ]);
 
   console.log(
-    `Seed complete: users=${users} categories=${categories} menuItems=${menuItems} tables=${tables} suppliers=${suppliers} ingredients=${ingredients} formulas=${formulas} addresses=${addresses} preferences=${preferences} favorites=${favorites} reservations=${reservations}`,
+    `Seed complete: users=${users} categories=${categories} menuItems=${menuItems} tables=${tables} suppliers=${suppliers} ingredients=${ingredients} formulas=${formulas} addresses=${addresses} preferences=${preferences} favorites=${favorites} reservations=${reservations} reviews=${reviews} loyaltyAccounts=${loyaltyAccounts} loyaltyTransactions=${loyaltyTransactions}`,
   );
 }
 
