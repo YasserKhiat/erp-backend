@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
@@ -103,7 +104,7 @@ export class ReservationsService {
     }
 
     if (actor.role === UserRole.CLIENT && reservation.userId !== actor.id) {
-      throw new NotFoundException('Reservation not found');
+      throw new ForbiddenException();
     }
 
     return reservation;

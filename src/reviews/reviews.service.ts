@@ -1,5 +1,6 @@
 import {
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -19,8 +20,12 @@ export class ReviewsService {
       },
     });
 
-    if (!order || order.customerId !== userId) {
+    if (!order) {
       throw new NotFoundException('Order not found');
+    }
+
+    if (order.customerId !== userId) {
+      throw new ForbiddenException();
     }
 
     if (order.status !== OrderStatus.COMPLETED) {
