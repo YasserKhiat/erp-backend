@@ -33,3 +33,17 @@ Health check: `/health`
 ## CI
 
 GitHub Actions workflow: lint + build on pushes to `develop`, `feature/*`, and pull requests.
+
+## Postman Validation
+
+- Import `postman/restaurant-erp.postman_collection.json`
+- Import `postman/restaurant-erp.local.postman_environment.json`
+- Set `baseUrl` and credentials in the environment
+- Run folder `Validation Flow` in order:
+	- Health
+	- Register Client
+	- Login
+	- List Menu Categories
+	- List Available Menu Items
+
+The login request stores `accessToken` automatically for authenticated endpoints.
