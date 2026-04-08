@@ -13,6 +13,8 @@ import { DashboardModule } from './dashboard/dashboard.module';
 import { TablesModule } from './tables/tables.module';
 import { ProcurementModule } from './procurement/procurement.module';
 import { ReservationsModule } from './reservations/reservations.module';
+import { ReviewsModule } from './reviews/reviews.module';
+import { LoyaltyModule } from './loyalty/loyalty.module';
 
 @Module({
   imports: [
@@ -30,6 +32,8 @@ import { ReservationsModule } from './reservations/reservations.module';
     InventoryModule,
     ProcurementModule,
     ReservationsModule,
+    ReviewsModule,
+    LoyaltyModule,
     PaymentsModule,
     DashboardModule,
   ],

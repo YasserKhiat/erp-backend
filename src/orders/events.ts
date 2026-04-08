@@ -19,3 +19,12 @@ export interface OrderValidatedEvent {
     }>;
   };
 }
+
+export interface OrderCompletedEvent {
+  order: {
+    id: string;
+    total: number;
+    customerId: string;
+    orderNumber: number;
+  };
+}

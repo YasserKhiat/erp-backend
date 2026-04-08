@@ -85,3 +85,13 @@ export const ReservationStatus = {
 
 export type ReservationStatus =
   (typeof ReservationStatus)[keyof typeof ReservationStatus];
+
+export const LoyaltyTransactionType = {
+  EARN_ORDER: 'EARN_ORDER',
+  BONUS_MILESTONE: 'BONUS_MILESTONE',
+  REDEEM_REWARD: 'REDEEM_REWARD',
+  MANUAL_ADJUSTMENT: 'MANUAL_ADJUSTMENT',
+} as const;
+
+export type LoyaltyTransactionType =
+  (typeof LoyaltyTransactionType)[keyof typeof LoyaltyTransactionType];

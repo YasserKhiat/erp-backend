@@ -74,6 +74,13 @@ enum ReservationStatus {
   NO_SHOW
 }
 
+enum LoyaltyTransactionType {
+  EARN_ORDER
+  BONUS_MILESTONE
+  REDEEM_REWARD
+  MANUAL_ADJUSTMENT
+}
+
 model User {
   id           String     @id @default(cuid())
   email        String     @unique
@@ -93,6 +100,9 @@ model User {
   preference   ClientPreference?
   favorites    FavoriteMenuItem[]
   reservations Reservation[]
+  reviews      Review[]
+  loyaltyAccount LoyaltyAccount?
+  loyaltyTransactions LoyaltyTransaction[]
 }
 
 model DiningTable {
@@ -154,6 +164,7 @@ model MenuItem {
   formulaItems FormulaBundleItem[]
   cartItems    CartItem[]
   favorites    FavoriteMenuItem[]
+  reviews      Review[]
 
   @@index([categoryId])
 }
@@ -327,6 +338,8 @@ model Order {
   table        DiningTable? @relation(fields: [tableId], references: [id])
   items        OrderItem[]
   payments     Payment[]
+  reviews      Review[]
+  loyaltyTransactions LoyaltyTransaction[]
 
   @@index([customerId])
   @@index([employeeId])
@@ -369,9 +382,65 @@ model OrderItem {
   totalPrice  Decimal   @db.Decimal(10, 2)
   order       Order     @relation(fields: [orderId], references: [id])
   menuItem    MenuItem  @relation(fields: [menuItemId], references: [id])
+  reviews     Review[]
 
   @@index([orderId])
   @@index([menuItemId])
+}
+
+model Review {
+  id          String   @id @default(cuid())
+  userId      String
+  orderId     String
+  orderItemId String
+  menuItemId  String
+  rating      Int
+  comment     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id])
+  order       Order    @relation(fields: [orderId], references: [id])
+  orderItem   OrderItem @relation(fields: [orderItemId], references: [id])
+  menuItem    MenuItem @relation(fields: [menuItemId], references: [id])
+
+  @@unique([userId, orderItemId])
+  @@index([menuItemId, createdAt])
+  @@index([orderId])
+  @@index([userId])
+}
+
+model LoyaltyAccount {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  points          Int      @default(0)
+  lifetimePoints  Int      @default(0)
+  completedOrders Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  user            User     @relation(fields: [userId], references: [id])
+  transactions    LoyaltyTransaction[]
+
+  @@index([points])
+}
+
+model LoyaltyTransaction {
+  id           String                 @id @default(cuid())
+  accountId    String
+  userId       String
+  orderId      String?
+  type         LoyaltyTransactionType
+  pointsDelta  Int
+  balanceAfter Int
+  reason       String?
+  referenceKey String?                @unique
+  createdAt    DateTime               @default(now())
+  account      LoyaltyAccount         @relation(fields: [accountId], references: [id])
+  user         User                   @relation(fields: [userId], references: [id])
+  order        Order?                 @relation(fields: [orderId], references: [id])
+
+  @@index([accountId, createdAt])
+  @@index([userId, createdAt])
+  @@index([orderId])
 }
 
 model Payment {
