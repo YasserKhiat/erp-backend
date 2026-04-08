@@ -73,3 +73,15 @@ export const SupplierOrderStatus = {
 
 export type SupplierOrderStatus =
   (typeof SupplierOrderStatus)[keyof typeof SupplierOrderStatus];
+
+export const ReservationStatus = {
+  PENDING: 'PENDING',
+  CONFIRMED: 'CONFIRMED',
+  SEATED: 'SEATED',
+  COMPLETED: 'COMPLETED',
+  CANCELLED: 'CANCELLED',
+  NO_SHOW: 'NO_SHOW',
+} as const;
+
+export type ReservationStatus =
+  (typeof ReservationStatus)[keyof typeof ReservationStatus];

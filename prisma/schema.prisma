@@ -65,6 +65,15 @@ enum SupplierOrderStatus {
   CANCELLED
 }
 
+enum ReservationStatus {
+  PENDING
+  CONFIRMED
+  SEATED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
 model User {
   id           String     @id @default(cuid())
   email        String     @unique
@@ -83,6 +92,7 @@ model User {
   addresses    ClientAddress[]
   preference   ClientPreference?
   favorites    FavoriteMenuItem[]
+  reservations Reservation[]
 }
 
 model DiningTable {
@@ -95,9 +105,30 @@ model DiningTable {
   updatedAt        DateTime    @updatedAt
   assignedWaiter   User?       @relation("TableAssignedWaiter", fields: [assignedWaiterId], references: [id])
   orders           Order[]
+  reservations     Reservation[]
 
   @@index([status])
   @@index([assignedWaiterId])
+}
+
+model Reservation {
+  id         String            @id @default(cuid())
+  userId     String?
+  tableId    String
+  guestCount Int
+  startAt    DateTime
+  endAt      DateTime
+  status     ReservationStatus @default(PENDING)
+  notes      String?
+  cancelledAt DateTime?
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+  user       User?             @relation(fields: [userId], references: [id])
+  table      DiningTable       @relation(fields: [tableId], references: [id])
+
+  @@index([tableId, startAt, endAt])
+  @@index([userId])
+  @@index([status])
 }
 
 model Category {

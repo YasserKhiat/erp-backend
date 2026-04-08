@@ -169,6 +169,41 @@ async function seedClientProfile(clientId, menuItems) {
   }
 }
 
+async function seedReservations(clientId) {
+  if (!clientId) {
+    return;
+  }
+
+  await prisma.reservation.deleteMany({});
+
+  const table = await prisma.diningTable.findFirst({
+    where: { code: 'T03' },
+    select: { id: true },
+  });
+
+  if (!table) {
+    return;
+  }
+
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setHours(19, 0, 0, 0);
+  const end = new Date(tomorrow);
+  end.setHours(21, 0, 0, 0);
+
+  await prisma.reservation.create({
+    data: {
+      userId: clientId,
+      tableId: table.id,
+      guestCount: 4,
+      startAt: tomorrow,
+      endAt: end,
+      status: 'CONFIRMED',
+      notes: 'Seeded reservation for validation',
+    },
+  });
+}
+
 async function upsertTable({ code, seats, assignedWaiterId }) {
   return prisma.diningTable.upsert({
     where: { code },
@@ -399,6 +434,7 @@ async function main() {
       orangeJuice,
       brownie,
     ]);
+    await seedReservations(client.id);
   }
 
   const [
@@ -412,6 +448,7 @@ async function main() {
     addresses,
     preferences,
     favorites,
+    reservations,
   ] =
     await Promise.all([
     prisma.user.count(),
@@ -424,10 +461,11 @@ async function main() {
     prisma.clientAddress.count(),
     prisma.clientPreference.count(),
     prisma.favoriteMenuItem.count(),
+    prisma.reservation.count(),
   ]);
 
   console.log(
-    `Seed complete: users=${users} categories=${categories} menuItems=${menuItems} tables=${tables} suppliers=${suppliers} ingredients=${ingredients} formulas=${formulas} addresses=${addresses} preferences=${preferences} favorites=${favorites}`,
+    `Seed complete: users=${users} categories=${categories} menuItems=${menuItems} tables=${tables} suppliers=${suppliers} ingredients=${ingredients} formulas=${formulas} addresses=${addresses} preferences=${preferences} favorites=${favorites} reservations=${reservations}`,
   );
 }
 
