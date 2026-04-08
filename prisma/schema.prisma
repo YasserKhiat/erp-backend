@@ -117,9 +117,36 @@ model MenuItem {
   category     Category            @relation(fields: [categoryId], references: [id])
   orderItems   OrderItem[]
   ingredients  MenuItemIngredient[]
+  formulaItems FormulaBundleItem[]
   cartItems    CartItem[]
 
   @@index([categoryId])
+}
+
+model FormulaBundle {
+  id          String              @id @default(cuid())
+  name        String              @unique
+  description String?
+  price       Decimal             @db.Decimal(10, 2)
+  isAvailable Boolean             @default(true)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  items       FormulaBundleItem[]
+
+  @@index([isAvailable])
+}
+
+model FormulaBundleItem {
+  id            String        @id @default(cuid())
+  bundleId      String
+  menuItemId    String
+  quantity      Int           @default(1)
+  formulaBundle FormulaBundle @relation(fields: [bundleId], references: [id])
+  menuItem      MenuItem      @relation(fields: [menuItemId], references: [id])
+
+  @@unique([bundleId, menuItemId])
+  @@index([bundleId])
+  @@index([menuItemId])
 }
 
 model Ingredient {
