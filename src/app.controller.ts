@@ -1,8 +1,10 @@
 import { Controller, Get } from '@nestjs/common';
-import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { PrismaService } from './prisma/prisma.service';
+import { ApiContractErrors, ApiContractOk } from './common/swagger/api-contract.decorators';
 
 @ApiTags('health')
+@ApiContractErrors()
 @Controller()
 export class AppController {
   constructor(private readonly prisma: PrismaService) {}
@@ -12,14 +14,15 @@ export class AppController {
     summary: 'Service health check',
     description: 'Reports API status and live database connectivity state.',
   })
-  @ApiOkResponse({
+  @ApiContractOk({
     description: 'Service and database status',
-    schema: {
-      example: {
-        status: 'ok',
-        service: 'restaurant-erp-backend',
-        database: 'connected',
-        timestamp: '2026-04-08T14:34:58.828Z',
+    dataSchema: {
+      type: 'object',
+      properties: {
+        status: { type: 'string', example: 'ok' },
+        service: { type: 'string', example: 'restaurant-erp-backend' },
+        database: { type: 'string', example: 'connected' },
+        timestamp: { type: 'string', example: '2026-04-08T14:34:58.828Z' },
       },
     },
   })

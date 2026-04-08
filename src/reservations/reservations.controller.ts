@@ -27,10 +27,16 @@ import { ListReservationsQueryDto } from './dto/list-reservations-query.dto';
 import { ReservationAvailabilityQueryDto } from './dto/reservation-availability-query.dto';
 import { UpdateReservationDto } from './dto/update-reservation.dto';
 import { UpdateReservationStatusDto } from './dto/update-reservation-status.dto';
+import {
+  ApiContractErrors,
+  ApiContractListOk,
+  ApiContractOk,
+} from '../common/swagger/api-contract.decorators';
 import { ReservationsService } from './reservations.service';
 
 @ApiTags('reservations')
 @ApiBearerAuth()
+@ApiContractErrors()
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('reservations')
 export class ReservationsController {
@@ -39,6 +45,7 @@ export class ReservationsController {
   @Post()
   @ApiOperation({ summary: 'Create reservation' })
   @ApiBody({ type: CreateReservationDto })
+  @ApiContractOk({ description: 'Reservation created.', dataSchema: { type: 'object' } })
   @Roles(UserRole.CLIENT, UserRole.ADMIN, UserRole.MANAGER, UserRole.EMPLOYEE)
   createReservation(
     @CurrentUser() user: { id: string; role: UserRole },
@@ -51,6 +58,7 @@ export class ReservationsController {
   @ApiOperation({ summary: 'List my reservations' })
   @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
   @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
+  @ApiContractListOk({ description: 'Paginated client reservations list.' })
   @Roles(UserRole.CLIENT)
   getMyReservations(
     @CurrentUser() user: { id: string },
@@ -66,6 +74,7 @@ export class ReservationsController {
   @ApiQuery({ name: 'startAt', required: true, type: String })
   @ApiQuery({ name: 'endAt', required: true, type: String })
   @ApiQuery({ name: 'guestCount', required: true, type: Number })
+  @ApiContractOk({ description: 'Reservation availability details.', dataSchema: { type: 'object' } })
   @Roles(UserRole.CLIENT, UserRole.ADMIN, UserRole.MANAGER, UserRole.EMPLOYEE)
   getAvailability(@Query() query: ReservationAvailabilityQueryDto) {
     return this.reservationsService.getAvailability(query);
@@ -75,6 +84,7 @@ export class ReservationsController {
   @ApiOperation({ summary: 'List reservations (backoffice)' })
   @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
   @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
+  @ApiContractListOk({ description: 'Paginated reservations list for backoffice.' })
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.EMPLOYEE)
   listReservations(@Query() query: ListReservationsQueryDto) {
     return this.reservationsService
@@ -85,6 +95,7 @@ export class ReservationsController {
   @Patch(':reservationId')
   @ApiOperation({ summary: 'Modify reservation' })
   @ApiBody({ type: UpdateReservationDto })
+  @ApiContractOk({ description: 'Reservation updated.', dataSchema: { type: 'object' } })
   @Roles(UserRole.CLIENT, UserRole.ADMIN, UserRole.MANAGER, UserRole.EMPLOYEE)
   updateReservation(
     @Param('reservationId') reservationId: string,
@@ -96,6 +107,7 @@ export class ReservationsController {
 
   @Patch(':reservationId/cancel')
   @ApiOperation({ summary: 'Cancel reservation' })
+  @ApiContractOk({ description: 'Reservation cancelled.', dataSchema: { type: 'object' } })
   @Roles(UserRole.CLIENT, UserRole.ADMIN, UserRole.MANAGER, UserRole.EMPLOYEE)
   cancelReservation(
     @Param('reservationId') reservationId: string,
@@ -107,6 +119,7 @@ export class ReservationsController {
   @Patch(':reservationId/status')
   @ApiOperation({ summary: 'Update reservation status (backoffice)' })
   @ApiBody({ type: UpdateReservationStatusDto })
+  @ApiContractOk({ description: 'Reservation status updated.', dataSchema: { type: 'object' } })
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.EMPLOYEE)
   updateStatus(
     @Param('reservationId') reservationId: string,

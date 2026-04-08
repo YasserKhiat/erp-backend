@@ -12,7 +12,6 @@ import {
 import {
   ApiBearerAuth,
   ApiBody,
-  ApiOkResponse,
   ApiOperation,
   ApiQuery,
   ApiTags,
@@ -30,10 +29,16 @@ import { PlaceOrderDto } from './dto/place-order.dto';
 import { RemoveOrderItemDto } from './dto/remove-order-item.dto';
 import { UpdateOrderItemDto } from './dto/update-order-item.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
+import {
+  ApiContractErrors,
+  ApiContractListOk,
+  ApiContractOk,
+} from '../common/swagger/api-contract.decorators';
 import { OrdersService } from './orders.service';
 
 @ApiTags('orders')
 @ApiBearerAuth()
+@ApiContractErrors()
 @UseGuards(JwtAuthGuard)
 @Controller('orders')
 export class OrdersController {
@@ -41,7 +46,7 @@ export class OrdersController {
 
   @Get('cart')
   @ApiOperation({ summary: 'Get active cart' })
-  @ApiOkResponse({ description: 'Returns current active cart with items.' })
+  @ApiContractOk({ description: 'Current active cart with items.', dataSchema: { type: 'object' } })
   @ApiUnauthorizedResponse({ description: 'JWT token is missing or invalid.' })
   getCart(@CurrentUser() user: { id: string }) {
     return this.ordersService.getCart(user.id);
@@ -50,13 +55,14 @@ export class OrdersController {
   @Post('cart/items')
   @ApiOperation({ summary: 'Add item to cart' })
   @ApiBody({ type: AddCartItemDto })
-  @ApiOkResponse({ description: 'Cart updated with requested item.' })
+  @ApiContractOk({ description: 'Cart updated with requested item.', dataSchema: { type: 'object' } })
   addCartItem(@CurrentUser() user: { id: string }, @Body() dto: AddCartItemDto) {
     return this.ordersService.addCartItem(user.id, dto);
   }
 
   @Post('cart/clear')
   @ApiOperation({ summary: 'Clear active cart' })
+  @ApiContractOk({ description: 'Active cart cleared.', dataSchema: { type: 'object' } })
   clearCart(@CurrentUser() user: { id: string }) {
     return this.ordersService.clearCart(user.id);
   }
@@ -64,7 +70,7 @@ export class OrdersController {
   @Post()
   @ApiOperation({ summary: 'Place order from active cart' })
   @ApiBody({ type: PlaceOrderDto })
-  @ApiOkResponse({ description: 'Order created from active cart.' })
+  @ApiContractOk({ description: 'Order created from active cart.', dataSchema: { type: 'object' } })
   placeOrder(
     @CurrentUser() user: { id: string; role: UserRole },
     @Body() dto: PlaceOrderDto,
@@ -74,9 +80,9 @@ export class OrdersController {
 
   @Get('history')
   @ApiOperation({ summary: 'Get order history of current client' })
-  @ApiOkResponse({ description: 'Returns authenticated client order history.' })
   @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
   @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
+  @ApiContractListOk({ description: 'Paginated authenticated client order history.' })
   getHistory(
     @CurrentUser() user: { id: string },
     @Query() pagination?: PaginationQueryDto,
@@ -88,7 +94,7 @@ export class OrdersController {
 
   @Get(':orderId')
   @ApiOperation({ summary: 'Get order details and tracking status' })
-  @ApiOkResponse({ description: 'Returns order details including items and payments.' })
+  @ApiContractOk({ description: 'Order details including items and payments.', dataSchema: { type: 'object' } })
   getOrder(
     @Param('orderId') orderId: string,
     @CurrentUser() user: { id: string; role: UserRole },
@@ -98,7 +104,7 @@ export class OrdersController {
 
   @Get(':orderId/tracking')
   @ApiOperation({ summary: 'Track my order status (client endpoint)' })
-  @ApiOkResponse({ description: 'Returns tracking-focused order information.' })
+  @ApiContractOk({ description: 'Tracking-focused order information.', dataSchema: { type: 'object' } })
   trackOrder(
     @Param('orderId') orderId: string,
     @CurrentUser() user: { id: string; role: UserRole },
@@ -109,7 +115,7 @@ export class OrdersController {
   @Patch(':orderId/status')
   @ApiOperation({ summary: 'Update order status (POS/backoffice)' })
   @ApiBody({ type: UpdateOrderStatusDto })
-  @ApiOkResponse({ description: 'Order status updated successfully.' })
+  @ApiContractOk({ description: 'Order status updated successfully.', dataSchema: { type: 'object' } })
   @UseGuards(RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.EMPLOYEE)
   updateStatus(
@@ -122,7 +128,7 @@ export class OrdersController {
   @Patch(':orderId/items/:orderItemId')
   @ApiOperation({ summary: 'Modify quantity of an in-progress order item' })
   @ApiBody({ type: UpdateOrderItemDto })
-  @ApiOkResponse({ description: 'Order item quantity updated.' })
+  @ApiContractOk({ description: 'Order item quantity updated.', dataSchema: { type: 'object' } })
   @UseGuards(RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.EMPLOYEE)
   updateOrderItem(
@@ -136,7 +142,7 @@ export class OrdersController {
   @Delete(':orderId/items/:orderItemId')
   @ApiOperation({ summary: 'Remove item from an in-progress order' })
   @ApiBody({ type: RemoveOrderItemDto, required: false })
-  @ApiOkResponse({ description: 'Order item removed or decremented.' })
+  @ApiContractOk({ description: 'Order item removed or decremented.', dataSchema: { type: 'object' } })
   @UseGuards(RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.EMPLOYEE)
   removeOrderItem(
