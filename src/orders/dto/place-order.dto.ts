@@ -13,6 +13,11 @@ export class PlaceOrderDto {
   @Min(1)
   tableNumber?: number;
 
+  @ApiPropertyOptional({ example: 'cmntableid123' })
+  @IsOptional()
+  @IsString()
+  tableId?: string;
+
   @ApiPropertyOptional({ example: 'No onions please.' })
   @IsOptional()
   @IsString()

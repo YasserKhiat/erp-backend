@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -22,6 +23,8 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
 import { AddCartItemDto } from './dto/add-cart-item.dto';
 import { PlaceOrderDto } from './dto/place-order.dto';
+import { RemoveOrderItemDto } from './dto/remove-order-item.dto';
+import { UpdateOrderItemDto } from './dto/update-order-item.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import { OrdersService } from './orders.service';
 
@@ -90,5 +93,33 @@ export class OrdersController {
     @Body() dto: UpdateOrderStatusDto,
   ) {
     return this.ordersService.updateOrderStatus(orderId, dto);
+  }
+
+  @Patch(':orderId/items/:orderItemId')
+  @ApiOperation({ summary: 'Modify quantity of an in-progress order item' })
+  @ApiBody({ type: UpdateOrderItemDto })
+  @ApiOkResponse({ description: 'Order item quantity updated.' })
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.EMPLOYEE)
+  updateOrderItem(
+    @Param('orderId') orderId: string,
+    @Param('orderItemId') orderItemId: string,
+    @Body() dto: UpdateOrderItemDto,
+  ) {
+    return this.ordersService.updateOrderItem(orderId, orderItemId, dto);
+  }
+
+  @Delete(':orderId/items/:orderItemId')
+  @ApiOperation({ summary: 'Remove item from an in-progress order' })
+  @ApiBody({ type: RemoveOrderItemDto, required: false })
+  @ApiOkResponse({ description: 'Order item removed or decremented.' })
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.EMPLOYEE)
+  removeOrderItem(
+    @Param('orderId') orderId: string,
+    @Param('orderItemId') orderItemId: string,
+    @Body() dto: RemoveOrderItemDto,
+  ) {
+    return this.ordersService.removeOrderItem(orderId, orderItemId, dto);
   }
 }

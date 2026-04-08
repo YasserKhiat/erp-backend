@@ -10,6 +10,7 @@ import { OrdersModule } from './orders/orders.module';
 import { InventoryModule } from './inventory/inventory.module';
 import { PaymentsModule } from './payments/payments.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { TablesModule } from './tables/tables.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
     AuthModule,
     MenuModule,
     OrdersModule,
+    TablesModule,
     InventoryModule,
     PaymentsModule,
     DashboardModule,

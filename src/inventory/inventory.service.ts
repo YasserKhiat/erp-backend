@@ -3,7 +3,7 @@ import { OnEvent } from '@nestjs/event-emitter';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../prisma/prisma.service';
 import { StockMovementType } from '../common/constants/domain-enums';
-import { OrderCreatedEvent } from '../orders/events';
+import { OrderValidatedEvent } from '../orders/events';
 import { CreateIngredientDto } from './dto/create-ingredient.dto';
 import { StockMovementDto } from './dto/stock-movement.dto';
 
@@ -85,8 +85,8 @@ export class InventoryService {
       );
   }
 
-  @OnEvent('order.created')
-  async handleOrderCreated(event: OrderCreatedEvent) {
+  @OnEvent('order.validated')
+  async handleOrderValidated(event: OrderValidatedEvent) {
     for (const orderItem of event.order.items) {
       const recipe = await this.prisma.menuItemIngredient.findMany({
         where: {

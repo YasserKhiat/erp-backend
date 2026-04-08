@@ -19,10 +19,18 @@ enum OrderStatus {
   CONFIRMED
   PREPARING
   READY
+  SERVED
+  BILLED
   OUT_FOR_DELIVERY
   DELIVERED
   COMPLETED
   CANCELLED
+}
+
+enum TableStatus {
+  AVAILABLE
+  OCCUPIED
+  RESERVED
 }
 
 enum OrderType {
@@ -61,8 +69,24 @@ model User {
   updatedAt    DateTime   @updatedAt
   customerOrders Order[]  @relation("CustomerOrders")
   employeeOrders Order[]  @relation("EmployeeOrders")
+  assignedTables DiningTable[] @relation("TableAssignedWaiter")
   carts        Cart[]
   payments     Payment[]
+}
+
+model DiningTable {
+  id               String      @id @default(cuid())
+  code             String      @unique
+  seats            Int
+  status           TableStatus @default(AVAILABLE)
+  assignedWaiterId String?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  assignedWaiter   User?       @relation("TableAssignedWaiter", fields: [assignedWaiterId], references: [id])
+  orders           Order[]
+
+  @@index([status])
+  @@index([assignedWaiterId])
 }
 
 model Category {
@@ -128,7 +152,10 @@ model Order {
   status       OrderStatus  @default(PENDING)
   orderType    OrderType
   tableNumber  Int?
+  tableId      String?
   notes        String?
+  billNumber   String?      @unique
+  billedAt     DateTime?
   subtotal     Decimal      @db.Decimal(10, 2)
   tax          Decimal      @db.Decimal(10, 2)
   total        Decimal      @db.Decimal(10, 2)
@@ -136,11 +163,13 @@ model Order {
   updatedAt    DateTime     @updatedAt
   customer     User?        @relation("CustomerOrders", fields: [customerId], references: [id])
   employee     User?        @relation("EmployeeOrders", fields: [employeeId], references: [id])
+  table        DiningTable? @relation(fields: [tableId], references: [id])
   items        OrderItem[]
   payments     Payment[]
 
   @@index([customerId])
   @@index([employeeId])
+  @@index([tableId])
   @@index([status])
 }
 
