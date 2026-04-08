@@ -75,6 +75,57 @@ async function upsertTable({ code, seats, assignedWaiterId }) {
   });
 }
 
+async function upsertSupplier({ name, email, phone, address }) {
+  return prisma.supplier.upsert({
+    where: { name },
+    update: {
+      email,
+      phone,
+      address,
+      isActive: true,
+    },
+    create: {
+      name,
+      email,
+      phone,
+      address,
+      isActive: true,
+    },
+  });
+}
+
+async function upsertIngredient({
+  name,
+  unit,
+  minStockLevel,
+  currentStock,
+  defaultSupplierId,
+}) {
+  return prisma.ingredient.upsert({
+    where: { name },
+    update: {
+      unit,
+      minStockLevel,
+      defaultSupplierId,
+      inventory: {
+        upsert: {
+          create: { currentStock },
+          update: { currentStock },
+        },
+      },
+    },
+    create: {
+      name,
+      unit,
+      minStockLevel,
+      defaultSupplierId,
+      inventory: {
+        create: { currentStock },
+      },
+    },
+  });
+}
+
 async function main() {
   console.log('Seeding users by role...');
   await upsertUser({
@@ -155,15 +206,48 @@ async function main() {
   await upsertTable({ code: 'T02', seats: 4, assignedWaiterId: waiter?.id });
   await upsertTable({ code: 'T03', seats: 6, assignedWaiterId: waiter?.id });
 
-  const [users, categories, menuItems, tables] = await Promise.all([
+  console.log('Seeding suppliers and ingredients...');
+  const supplier = await upsertSupplier({
+    name: 'FreshFarm Supplies',
+    email: 'contact@freshfarm.test',
+    phone: '+212600000001',
+    address: 'Zone Industrielle, Casablanca',
+  });
+
+  await upsertIngredient({
+    name: 'Beef Patty',
+    unit: 'pcs',
+    minStockLevel: '20',
+    currentStock: '120',
+    defaultSupplierId: supplier.id,
+  });
+  await upsertIngredient({
+    name: 'Burger Bun',
+    unit: 'pcs',
+    minStockLevel: '40',
+    currentStock: '180',
+    defaultSupplierId: supplier.id,
+  });
+  await upsertIngredient({
+    name: 'Mozzarella',
+    unit: 'kg',
+    minStockLevel: '5',
+    currentStock: '25',
+    defaultSupplierId: supplier.id,
+  });
+
+  const [users, categories, menuItems, tables, suppliers, ingredients] =
+    await Promise.all([
     prisma.user.count(),
     prisma.category.count(),
     prisma.menuItem.count(),
     prisma.diningTable.count(),
+    prisma.supplier.count(),
+    prisma.ingredient.count(),
   ]);
 
   console.log(
-    `Seed complete: users=${users} categories=${categories} menuItems=${menuItems} tables=${tables}`,
+    `Seed complete: users=${users} categories=${categories} menuItems=${menuItems} tables=${tables} suppliers=${suppliers} ingredients=${ingredients}`,
   );
 }
 

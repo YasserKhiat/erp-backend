@@ -62,3 +62,14 @@ export const TableStatus = {
 } as const;
 
 export type TableStatus = (typeof TableStatus)[keyof typeof TableStatus];
+
+export const SupplierOrderStatus = {
+  DRAFT: 'DRAFT',
+  SUBMITTED: 'SUBMITTED',
+  PARTIALLY_RECEIVED: 'PARTIALLY_RECEIVED',
+  RECEIVED: 'RECEIVED',
+  CANCELLED: 'CANCELLED',
+} as const;
+
+export type SupplierOrderStatus =
+  (typeof SupplierOrderStatus)[keyof typeof SupplierOrderStatus];
