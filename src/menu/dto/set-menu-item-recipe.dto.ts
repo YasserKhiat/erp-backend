@@ -4,6 +4,7 @@ import {
   IsArray,
   IsNumber,
   IsString,
+  Min,
   ValidateNested,
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
@@ -16,6 +17,7 @@ class RecipeIngredientDto {
   @ApiProperty({ example: 1.2 })
   @Type(() => Number)
   @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0.01)
   quantityNeeded: number;
 }
 

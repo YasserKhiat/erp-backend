@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Post,
@@ -127,5 +128,14 @@ export class MenuController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   getMenuItemMargin(@Param('id') id: string) {
     return this.menuService.getMenuItemMargin(id);
+  }
+
+  @Delete('items/:id')
+  @ApiOperation({ summary: 'Delete menu item if not used by active orders' })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  removeMenuItem(@Param('id') id: string) {
+    return this.menuService.deleteMenuItem(id);
   }
 }
