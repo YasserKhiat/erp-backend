@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
@@ -410,7 +411,7 @@ export class OrdersService {
     }
 
     if (user?.role === UserRole.CLIENT && order.customerId !== user.id) {
-      throw new NotFoundException('Order not found');
+      throw new ForbiddenException();
     }
 
     return order;
@@ -435,7 +436,7 @@ export class OrdersService {
     }
 
     if (user.role === UserRole.CLIENT && order.customerId !== user.id) {
-      throw new NotFoundException('Order not found');
+      throw new ForbiddenException();
     }
 
     return {
