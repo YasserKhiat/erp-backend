@@ -12,6 +12,7 @@ import { PaymentsModule } from './payments/payments.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { TablesModule } from './tables/tables.module';
 import { ProcurementModule } from './procurement/procurement.module';
+import { ReservationsModule } from './reservations/reservations.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { ProcurementModule } from './procurement/procurement.module';
     TablesModule,
     InventoryModule,
     ProcurementModule,
+    ReservationsModule,
     PaymentsModule,
     DashboardModule,
   ],
