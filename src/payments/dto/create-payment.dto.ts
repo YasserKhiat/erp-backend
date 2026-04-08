@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsEnum, IsNumber, IsOptional, IsString } from 'class-validator';
+import { IsEnum, IsNumber, IsOptional, IsString, Min } from 'class-validator';
 import { PaymentMethod } from '../../common/constants/domain-enums';
 
 export class CreatePaymentDto {
@@ -8,6 +8,7 @@ export class CreatePaymentDto {
 
   @Type(() => Number)
   @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0.01)
   amount: number;
 
   @IsEnum(PaymentMethod)

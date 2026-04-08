@@ -1,6 +1,10 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { PaymentStatus } from '../common/constants/domain-enums';
+import { OrderStatus, PaymentStatus } from '../common/constants/domain-enums';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 
 @Injectable()
@@ -14,18 +18,43 @@ export class PaymentsService {
     });
 
     if (!order) {
-      throw new BadRequestException('Order not found');
+      throw new NotFoundException('Order not found');
+    }
+
+    if (order.status === OrderStatus.CANCELLED) {
+      throw new ConflictException('INVALID_ORDER_STATUS');
     }
 
     const paidSoFar = order.payments
       .filter((p) => p.status === PaymentStatus.PAID)
       .reduce((acc, payment) => acc + Number(payment.amount), 0);
 
-    if (paidSoFar + dto.amount > Number(order.total)) {
-      throw new BadRequestException('Payment exceeds order total');
+    const orderTotal = Number(order.total);
+    if (paidSoFar >= orderTotal) {
+      throw new ConflictException('ORDER_ALREADY_PAID');
     }
 
-    return this.prisma.payment.create({
+    const remaining = orderTotal - paidSoFar;
+
+    if (dto.amount > remaining) {
+      throw new ConflictException('PAYMENT_EXCEEDS_ORDER_TOTAL');
+    }
+
+    if (dto.transactionRef) {
+      const duplicateTx = await this.prisma.payment.findFirst({
+        where: {
+          orderId: dto.orderId,
+          transactionRef: dto.transactionRef,
+        },
+        select: { id: true },
+      });
+
+      if (duplicateTx) {
+        throw new ConflictException('DUPLICATE_PAYMENT_REFERENCE');
+      }
+    }
+
+    const payment = await this.prisma.payment.create({
       data: {
         orderId: dto.orderId,
         userId,
@@ -35,6 +64,19 @@ export class PaymentsService {
         transactionRef: dto.transactionRef,
       },
     });
+
+    const newPaidTotal = paidSoFar + Number(payment.amount);
+
+    return {
+      payment,
+      summary: {
+        orderId: order.id,
+        orderTotal,
+        paidTotal: newPaidTotal,
+        remaining: Math.max(0, orderTotal - newPaidTotal),
+        isFullyPaid: newPaidTotal >= orderTotal,
+      },
+    };
   }
 
   getTransactions() {
