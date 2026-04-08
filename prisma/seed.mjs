@@ -60,6 +60,21 @@ async function upsertMenuItem({ name, description, price, categoryId }) {
   });
 }
 
+async function upsertTable({ code, seats, assignedWaiterId }) {
+  return prisma.diningTable.upsert({
+    where: { code },
+    update: {
+      seats,
+      assignedWaiterId,
+    },
+    create: {
+      code,
+      seats,
+      assignedWaiterId,
+    },
+  });
+}
+
 async function main() {
   console.log('Seeding users by role...');
   await upsertUser({
@@ -85,6 +100,10 @@ async function main() {
     fullName: 'Regular Client',
     role: UserRole.CLIENT,
     password: 'Client123!',
+  });
+
+  const waiter = await prisma.user.findUnique({
+    where: { email: 'employee@restaurant.local' },
   });
 
   console.log('Seeding categories...');
@@ -131,14 +150,20 @@ async function main() {
     categoryId: desserts.id,
   });
 
-  const [users, categories, menuItems] = await Promise.all([
+  console.log('Seeding dining tables...');
+  await upsertTable({ code: 'T01', seats: 2, assignedWaiterId: waiter?.id });
+  await upsertTable({ code: 'T02', seats: 4, assignedWaiterId: waiter?.id });
+  await upsertTable({ code: 'T03', seats: 6, assignedWaiterId: waiter?.id });
+
+  const [users, categories, menuItems, tables] = await Promise.all([
     prisma.user.count(),
     prisma.category.count(),
     prisma.menuItem.count(),
+    prisma.diningTable.count(),
   ]);
 
   console.log(
-    `Seed complete: users=${users} categories=${categories} menuItems=${menuItems}`,
+    `Seed complete: users=${users} categories=${categories} menuItems=${menuItems} tables=${tables}`,
   );
 }
 

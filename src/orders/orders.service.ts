@@ -3,14 +3,22 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../prisma/prisma.service';
-import { OrderStatus, UserRole } from '../common/constants/domain-enums';
+import {
+  OrderStatus,
+  OrderType,
+  TableStatus,
+  UserRole,
+} from '../common/constants/domain-enums';
 import { AddCartItemDto } from './dto/add-cart-item.dto';
 import { PlaceOrderDto } from './dto/place-order.dto';
+import { RemoveOrderItemDto } from './dto/remove-order-item.dto';
+import { UpdateOrderItemDto } from './dto/update-order-item.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
-import { OrderCreatedEvent } from './events';
+import { OrderCreatedEvent, OrderValidatedEvent } from './events';
 
 @Injectable()
 export class OrdersService {
@@ -26,6 +34,83 @@ export class OrdersService {
 
   private roundMoney(value: number): number {
     return Math.round(value * 100) / 100;
+  }
+
+  private getStatusTransitions(status: OrderStatus): OrderStatus[] {
+    const transitions: Record<OrderStatus, OrderStatus[]> = {
+      PENDING: [OrderStatus.CONFIRMED, OrderStatus.CANCELLED],
+      CONFIRMED: [
+        OrderStatus.PREPARING,
+        OrderStatus.CANCELLED,
+        OrderStatus.OUT_FOR_DELIVERY,
+      ],
+      PREPARING: [OrderStatus.READY, OrderStatus.CANCELLED],
+      READY: [OrderStatus.SERVED, OrderStatus.OUT_FOR_DELIVERY, OrderStatus.CANCELLED],
+      SERVED: [OrderStatus.BILLED, OrderStatus.COMPLETED],
+      BILLED: [OrderStatus.COMPLETED],
+      OUT_FOR_DELIVERY: [OrderStatus.DELIVERED, OrderStatus.CANCELLED],
+      DELIVERED: [OrderStatus.COMPLETED],
+      COMPLETED: [],
+      CANCELLED: [],
+    };
+
+    return transitions[status] ?? [];
+  }
+
+  private canEditOrderItems(status: OrderStatus): boolean {
+    const editableStatuses: OrderStatus[] = [
+      OrderStatus.PENDING,
+      OrderStatus.CONFIRMED,
+      OrderStatus.PREPARING,
+      OrderStatus.READY,
+    ];
+
+    return editableStatuses.includes(status);
+  }
+
+  private async recalculateOrderTotals(
+    tx: Prisma.TransactionClient,
+    orderId: string,
+  ) {
+    const items = await tx.orderItem.findMany({
+      where: { orderId },
+      include: { menuItem: true },
+    });
+
+    if (items.length === 0) {
+      throw new BadRequestException('Order must contain at least one item');
+    }
+
+    const subtotal = this.roundMoney(
+      items.reduce(
+        (acc, item) => acc + Number(item.menuItem.price) * item.quantity,
+        0,
+      ),
+    );
+    const tax = this.roundMoney(subtotal * this.getTaxRate());
+    const total = this.roundMoney(subtotal + tax);
+
+    await tx.order.update({
+      where: { id: orderId },
+      data: { subtotal, tax, total },
+    });
+  }
+
+  private buildOrderEventPayload(order: {
+    id: string;
+    total: Prisma.Decimal;
+    items: Array<{ menuItemId: string; quantity: number }>;
+  }): OrderCreatedEvent {
+    return {
+      order: {
+        id: order.id,
+        total: Number(order.total),
+        items: order.items.map((item) => ({
+          menuItemId: item.menuItemId,
+          quantity: item.quantity,
+        })),
+      },
+    };
   }
 
   private async getOrCreateActiveCart(userId: string) {
@@ -117,11 +202,33 @@ export class OrdersService {
       throw new BadRequestException('Cart is empty');
     }
 
+    if (dto.orderType === OrderType.DINE_IN && !dto.tableId) {
+      throw new BadRequestException('Dine-in orders require tableId');
+    }
+
+    if (dto.tableId) {
+      const table = await this.prisma.diningTable.findUnique({
+        where: { id: dto.tableId },
+        select: { id: true, status: true },
+      });
+
+      if (!table) {
+        throw new NotFoundException('Dining table not found');
+      }
+
+      if (
+        dto.orderType === OrderType.DINE_IN &&
+        table.status === TableStatus.OCCUPIED
+      ) {
+        throw new BadRequestException('Dining table is already occupied');
+      }
+    }
+
     const subtotal = this.roundMoney(
       cart.items.reduce(
-      (acc, item) => acc + Number(item.menuItem.price) * item.quantity,
-      0,
-    ),
+        (acc, item) => acc + Number(item.menuItem.price) * item.quantity,
+        0,
+      ),
     );
     const tax = this.roundMoney(subtotal * this.getTaxRate());
     const total = this.roundMoney(subtotal + tax);
@@ -131,8 +238,10 @@ export class OrdersService {
         data: {
           customerId: user.role === UserRole.CLIENT ? user.id : undefined,
           employeeId: user.role !== UserRole.CLIENT ? user.id : undefined,
+          status: OrderStatus.CONFIRMED,
           orderType: dto.orderType,
           tableNumber: dto.tableNumber,
+          tableId: dto.tableId,
           notes: dto.notes,
           subtotal,
           tax,
@@ -153,6 +262,13 @@ export class OrdersService {
         },
       });
 
+      if (dto.orderType === OrderType.DINE_IN && dto.tableId) {
+        await tx.diningTable.update({
+          where: { id: dto.tableId },
+          data: { status: TableStatus.OCCUPIED },
+        });
+      }
+
       await tx.cart.update({
         where: { id: cart.id },
         data: { isActive: false },
@@ -161,16 +277,10 @@ export class OrdersService {
       return created;
     });
 
-    this.eventEmitter.emit('order.created', {
-      order: {
-        id: order.id,
-        total: Number(order.total),
-        items: order.items.map((item) => ({
-          menuItemId: item.menuItemId,
-          quantity: item.quantity,
-        })),
-      },
-    } as OrderCreatedEvent);
+    this.eventEmitter.emit(
+      'order.created',
+      this.buildOrderEventPayload(order) as OrderCreatedEvent,
+    );
 
     return order;
   }
@@ -178,7 +288,11 @@ export class OrdersService {
   getOrderHistory(userId: string) {
     return this.prisma.order.findMany({
       where: { customerId: userId },
-      include: { items: { include: { menuItem: true } }, payments: true },
+      include: {
+        items: { include: { menuItem: true } },
+        payments: true,
+        table: true,
+      },
       orderBy: { createdAt: 'desc' },
     });
   }
@@ -186,7 +300,11 @@ export class OrdersService {
   async getOrder(orderId: string) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
-      include: { items: { include: { menuItem: true } }, payments: true },
+      include: {
+        items: { include: { menuItem: true } },
+        payments: true,
+        table: true,
+      },
     });
 
     if (!order) {
@@ -197,18 +315,146 @@ export class OrdersService {
   }
 
   async updateOrderStatus(orderId: string, dto: UpdateOrderStatusDto) {
-    const existing = await this.prisma.order.findUnique({ where: { id: orderId } });
+    const existing = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { items: true },
+    });
     if (!existing) {
       throw new NotFoundException('Order not found');
     }
 
-    if (existing.status === OrderStatus.CANCELLED) {
-      throw new BadRequestException('Cancelled orders cannot be updated');
+    const nextStatuses = this.getStatusTransitions(existing.status as OrderStatus);
+    if (!nextStatuses.includes(dto.status)) {
+      throw new BadRequestException(
+        `Invalid status transition from ${existing.status} to ${dto.status}`,
+      );
     }
 
-    return this.prisma.order.update({
-      where: { id: orderId },
-      data: { status: dto.status },
+    const updateData: Prisma.OrderUpdateInput = {
+      status: dto.status,
+    };
+
+    if (dto.status === OrderStatus.BILLED) {
+      updateData.billNumber = existing.billNumber ?? `BILL-${existing.orderNumber}`;
+      updateData.billedAt = new Date();
+    }
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const order = await tx.order.update({
+        where: { id: orderId },
+        data: updateData,
+        include: { items: true },
+      });
+
+      const releaseTableStatuses: OrderStatus[] = [
+        OrderStatus.COMPLETED,
+        OrderStatus.CANCELLED,
+      ];
+
+      if (order.tableId && releaseTableStatuses.includes(dto.status)) {
+        await tx.diningTable.update({
+          where: { id: order.tableId },
+          data: { status: TableStatus.AVAILABLE },
+        });
+      }
+
+      return order;
     });
+
+    if (dto.status === OrderStatus.PREPARING) {
+      this.eventEmitter.emit(
+        'order.validated',
+        this.buildOrderEventPayload(updated) as OrderValidatedEvent,
+      );
+    }
+
+    return updated;
+  }
+
+  async updateOrderItem(
+    orderId: string,
+    orderItemId: string,
+    dto: UpdateOrderItemDto,
+  ) {
+    const order = await this.prisma.order.findUnique({ where: { id: orderId } });
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+
+    if (!this.canEditOrderItems(order.status as OrderStatus)) {
+      throw new BadRequestException('Order items cannot be modified at this status');
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      const item = await tx.orderItem.findFirst({
+        where: { id: orderItemId, orderId },
+      });
+
+      if (!item) {
+        throw new NotFoundException('Order item not found');
+      }
+
+      const menuItem = await tx.menuItem.findUnique({
+        where: { id: item.menuItemId },
+      });
+
+      if (!menuItem) {
+        throw new NotFoundException('Menu item not found');
+      }
+
+      await tx.orderItem.update({
+        where: { id: orderItemId },
+        data: {
+          quantity: dto.quantity,
+          totalPrice: this.roundMoney(Number(menuItem.price) * dto.quantity),
+        },
+      });
+
+      await this.recalculateOrderTotals(tx, orderId);
+    });
+
+    return this.getOrder(orderId);
+  }
+
+  async removeOrderItem(
+    orderId: string,
+    orderItemId: string,
+    dto: RemoveOrderItemDto,
+  ) {
+    const order = await this.prisma.order.findUnique({ where: { id: orderId } });
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+
+    if (!this.canEditOrderItems(order.status as OrderStatus)) {
+      throw new BadRequestException('Order items cannot be modified at this status');
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      const item = await tx.orderItem.findFirst({
+        where: { id: orderItemId, orderId },
+      });
+
+      if (!item) {
+        throw new NotFoundException('Order item not found');
+      }
+
+      if (dto.removeAll || item.quantity <= 1) {
+        await tx.orderItem.delete({ where: { id: orderItemId } });
+      } else {
+        const nextQty = item.quantity - 1;
+        await tx.orderItem.update({
+          where: { id: orderItemId },
+          data: {
+            quantity: nextQty,
+            totalPrice: this.roundMoney(Number(item.unitPrice) * nextQty),
+          },
+        });
+      }
+
+      await this.recalculateOrderTotals(tx, orderId);
+    });
+
+    return this.getOrder(orderId);
   }
 }

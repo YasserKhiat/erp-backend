@@ -12,6 +12,8 @@ export const OrderStatus = {
   CONFIRMED: 'CONFIRMED',
   PREPARING: 'PREPARING',
   READY: 'READY',
+  SERVED: 'SERVED',
+  BILLED: 'BILLED',
   OUT_FOR_DELIVERY: 'OUT_FOR_DELIVERY',
   DELIVERED: 'DELIVERED',
   COMPLETED: 'COMPLETED',
@@ -52,3 +54,11 @@ export const StockMovementType = {
 
 export type StockMovementType =
   (typeof StockMovementType)[keyof typeof StockMovementType];
+
+export const TableStatus = {
+  AVAILABLE: 'AVAILABLE',
+  OCCUPIED: 'OCCUPIED',
+  RESERVED: 'RESERVED',
+} as const;
+
+export type TableStatus = (typeof TableStatus)[keyof typeof TableStatus];
