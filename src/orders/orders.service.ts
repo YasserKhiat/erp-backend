@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
@@ -20,13 +21,16 @@ import { RemoveOrderItemDto } from './dto/remove-order-item.dto';
 import { UpdateOrderItemDto } from './dto/update-order-item.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import {
+  OrderCancelledEvent,
+  OrderConfirmedEvent,
   OrderCompletedEvent,
   OrderCreatedEvent,
-  OrderValidatedEvent,
 } from './events';
 
 @Injectable()
 export class OrdersService {
+  private readonly logger = new Logger(OrdersService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
@@ -148,17 +152,35 @@ export class OrdersService {
 
   private buildOrderEventPayload(order: {
     id: string;
+    orderNumber: number;
+    customerId?: string | null;
     total: Prisma.Decimal;
     items: Array<{ menuItemId: string; quantity: number }>;
   }): OrderCreatedEvent {
     return {
       order: {
         id: order.id,
+        orderNumber: order.orderNumber,
+        customerId: order.customerId ?? undefined,
         total: Number(order.total),
         items: order.items.map((item) => ({
           menuItemId: item.menuItemId,
           quantity: item.quantity,
         })),
+      },
+    };
+  }
+
+  private buildOrderCancelledEventPayload(order: {
+    id: string;
+    orderNumber: number;
+    customerId?: string | null;
+  }): OrderCancelledEvent {
+    return {
+      order: {
+        id: order.id,
+        orderNumber: order.orderNumber,
+        customerId: order.customerId ?? undefined,
       },
     };
   }
@@ -350,10 +372,13 @@ export class OrdersService {
       return created;
     });
 
-    this.eventEmitter.emit(
-      'order.created',
-      this.buildOrderEventPayload(order) as OrderCreatedEvent,
-    );
+    const createdEvent = this.buildOrderEventPayload(order) as OrderCreatedEvent;
+    this.logger.log(`Emitting order.created for order ${order.id}`);
+    this.eventEmitter.emit('order.created', createdEvent);
+
+    const confirmedEvent = createdEvent as OrderConfirmedEvent;
+    this.logger.log(`Emitting order.confirmed for order ${order.id}`);
+    this.eventEmitter.emit('order.confirmed', confirmedEvent);
 
     return order;
   }
@@ -476,14 +501,8 @@ export class OrdersService {
       return order;
     });
 
-    if (dto.status === OrderStatus.PREPARING) {
-      this.eventEmitter.emit(
-        'order.validated',
-        this.buildOrderEventPayload(updated) as OrderValidatedEvent,
-      );
-    }
-
     if (dto.status === OrderStatus.COMPLETED && updated.customerId) {
+      this.logger.log(`Emitting order.completed for order ${updated.id}`);
       this.eventEmitter.emit(
         'order.completed',
         this.buildOrderCompletedEventPayload({
@@ -492,6 +511,18 @@ export class OrdersService {
           customerId: updated.customerId,
           orderNumber: updated.orderNumber,
         }) as OrderCompletedEvent,
+      );
+    }
+
+    if (dto.status === OrderStatus.CANCELLED) {
+      this.logger.log(`Emitting order.cancelled for order ${updated.id}`);
+      this.eventEmitter.emit(
+        'order.cancelled',
+        this.buildOrderCancelledEventPayload({
+          id: updated.id,
+          orderNumber: updated.orderNumber,
+          customerId: updated.customerId,
+        }) as OrderCancelledEvent,
       );
     }
 
