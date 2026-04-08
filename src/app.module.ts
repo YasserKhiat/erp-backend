@@ -11,6 +11,7 @@ import { InventoryModule } from './inventory/inventory.module';
 import { PaymentsModule } from './payments/payments.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { TablesModule } from './tables/tables.module';
+import { ProcurementModule } from './procurement/procurement.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { TablesModule } from './tables/tables.module';
     OrdersModule,
     TablesModule,
     InventoryModule,
+    ProcurementModule,
     PaymentsModule,
     DashboardModule,
   ],

@@ -57,6 +57,14 @@ enum StockMovementType {
   ADJUSTMENT
 }
 
+enum SupplierOrderStatus {
+  DRAFT
+  SUBMITTED
+  PARTIALLY_RECEIVED
+  RECEIVED
+  CANCELLED
+}
+
 model User {
   id           String     @id @default(cuid())
   email        String     @unique
@@ -119,11 +127,62 @@ model Ingredient {
   name            String              @unique
   unit            String
   minStockLevel   Decimal             @db.Decimal(10, 2)
+  defaultSupplierId String?
   createdAt       DateTime            @default(now())
   updatedAt       DateTime            @updatedAt
+  defaultSupplier Supplier?           @relation(fields: [defaultSupplierId], references: [id])
   inventory       Inventory?
   menuItems       MenuItemIngredient[]
   stockMovements  StockMovement[]
+  supplierOrderItems SupplierOrderItem[]
+}
+
+model Supplier {
+  id          String          @id @default(cuid())
+  name        String
+  email       String?
+  phone       String?
+  address     String?
+  isActive    Boolean         @default(true)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  ingredients Ingredient[]
+  orders      SupplierOrder[]
+
+  @@unique([name])
+}
+
+model SupplierOrder {
+  id           String              @id @default(cuid())
+  supplierId   String
+  status       SupplierOrderStatus @default(DRAFT)
+  notes        String?
+  orderedAt    DateTime            @default(now())
+  receivedAt   DateTime?
+  totalAmount  Decimal             @db.Decimal(12, 2) @default(0)
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+  supplier     Supplier            @relation(fields: [supplierId], references: [id])
+  items        SupplierOrderItem[]
+
+  @@index([supplierId])
+  @@index([status])
+}
+
+model SupplierOrderItem {
+  id               String        @id @default(cuid())
+  supplierOrderId  String
+  ingredientId     String
+  quantity         Decimal       @db.Decimal(10, 2)
+  unitCost         Decimal       @db.Decimal(10, 2)
+  lineTotal        Decimal       @db.Decimal(12, 2)
+  createdAt        DateTime      @default(now())
+  supplierOrder    SupplierOrder @relation(fields: [supplierOrderId], references: [id])
+  ingredient       Ingredient    @relation(fields: [ingredientId], references: [id])
+
+  @@unique([supplierOrderId, ingredientId])
+  @@index([supplierOrderId])
+  @@index([ingredientId])
 }
 
 model Inventory {
