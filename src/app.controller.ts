@@ -9,6 +9,34 @@ import { ApiContractErrors, ApiContractOk } from './common/swagger/api-contract.
 export class AppController {
   constructor(private readonly prisma: PrismaService) {}
 
+  @Get()
+  @ApiOperation({
+    summary: 'Service entrypoint',
+    description: 'Provides quick links to API documentation and health check.',
+  })
+  @ApiContractOk({
+    description: 'Service entrypoint metadata',
+    dataSchema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: true },
+        service: { type: 'string', example: 'restaurant-erp-backend' },
+        message: { type: 'string', example: 'API is running' },
+        docs: { type: 'string', example: '/docs' },
+        health: { type: 'string', example: '/health' },
+      },
+    },
+  })
+  root() {
+    return {
+      success: true,
+      service: 'restaurant-erp-backend',
+      message: 'API is running',
+      docs: '/docs',
+      health: '/health',
+    };
+  }
+
   @Get('health')
   @ApiOperation({
     summary: 'Service health check',
