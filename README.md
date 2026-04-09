@@ -58,6 +58,132 @@ npm run prisma:migrate
 npm run prisma:seed
 ```
 
+## Docker / Containerized Setup
+
+Run the backend in Docker without installing Node.js, npm dependencies, or Prisma tooling locally.
+
+Important:
+
+- This repository containerizes only the backend application.
+- PostgreSQL remains hosted remotely on AWS RDS.
+- Docker Compose does not start a local PostgreSQL container.
+
+### Prerequisites
+
+- Docker Desktop (Windows/macOS) or Docker Engine + Docker Compose plugin (Linux)
+
+### Environment Configuration
+
+1. Copy `.env.example` to `.env`.
+2. Set real values, especially:
+	 - `DATABASE_URL` (AWS RDS connection string)
+	 - `JWT_SECRET`
+	 - `JWT_EXPIRES_IN`
+	 - `PORT`
+	 - `TAX_RATE`
+
+Do not commit real secrets.
+
+### Start Backend with Docker
+
+```bash
+docker compose up --build
+```
+
+or with npm helpers:
+
+```bash
+npm run docker:up
+```
+
+Backend URLs:
+
+- API base: `http://localhost:3000`
+- Swagger UI: `http://localhost:3000/docs`
+- Health: `http://localhost:3000/health`
+
+### Common Docker Commands
+
+```bash
+# Start in background
+docker compose up --build -d
+
+# View logs
+docker compose logs -f api
+
+# Stop services
+docker compose down
+
+# Rebuild image without cache
+docker compose build --no-cache api
+```
+
+Equivalent npm helpers:
+
+```bash
+npm run docker:up:detached
+npm run docker:logs
+npm run docker:down
+npm run docker:rebuild
+```
+
+### Prisma in Docker
+
+The image runs `prisma generate` during build, so Prisma Client is available in the container.
+
+Use explicit one-off commands for schema operations (recommended):
+
+```bash
+# Generate Prisma client
+docker compose run --rm api npm run prisma:generate
+
+# Apply committed migrations to AWS RDS
+docker compose run --rm api npm run prisma:deploy
+
+# Seed data
+docker compose run --rm api npm run prisma:seed
+```
+
+Or with npm helpers:
+
+```bash
+npm run docker:prisma:generate
+npm run docker:prisma:deploy
+npm run docker:prisma:seed
+```
+
+Notes:
+
+- Keep migration and seed execution explicit; they are not auto-run at container startup.
+- Prefer `prisma migrate deploy` for shared environments.
+
+### Onboarding Flow
+
+```bash
+git clone <repo-url>
+cd erp-backend
+cp .env.example .env
+# edit .env with AWS RDS and JWT values
+docker compose up --build
+```
+
+### AWS RDS Connectivity Notes
+
+- Ensure AWS RDS security groups allow inbound traffic from your current public IP.
+- Ensure `DATABASE_URL` points to the correct host/port/database.
+- If SSL is required by your RDS setup, include required SSL parameters in `DATABASE_URL`.
+
+### Troubleshooting
+
+- Container starts but API cannot query DB:
+	- Verify `DATABASE_URL` and AWS network rules (security group/NACL/VPC routing).
+- `P1001` / cannot reach database:
+	- Confirm RDS instance is publicly reachable from your environment or connected through VPN/bastion.
+- Prisma schema changed but runtime errors persist:
+	- Re-run `docker compose run --rm api npm run prisma:generate`.
+- Port conflict on `3000`:
+	- Change `PORT` in `.env` and restart compose.
+
 ## Running the App
 
 ```bash
