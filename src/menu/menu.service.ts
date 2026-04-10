@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateFormulaBundleDto } from './dto/create-formula-bundle.dto';
 import { CreateCategoryDto } from './dto/create-category.dto';
@@ -13,7 +14,10 @@ import { SetMenuItemRecipeDto } from './dto/set-menu-item-recipe.dto';
 
 @Injectable()
 export class MenuService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cloudinaryService: CloudinaryService,
+  ) {}
 
   createCategory(dto: CreateCategoryDto) {
     return this.prisma.category.create({
@@ -81,6 +85,45 @@ export class MenuService {
       },
       orderBy: {
         name: 'asc',
+      },
+    });
+  }
+
+  async getMenuItemById(menuItemId: string) {
+    const menuItem = await this.prisma.menuItem.findUnique({
+      where: { id: menuItemId },
+      include: {
+        category: true,
+      },
+    });
+
+    if (!menuItem) {
+      throw new NotFoundException('Menu item not found');
+    }
+
+    return menuItem;
+  }
+
+  async uploadMenuItemImage(menuItemId: string, file: Express.Multer.File) {
+    const menuItem = await this.prisma.menuItem.findUnique({
+      where: { id: menuItemId },
+      select: { id: true },
+    });
+
+    if (!menuItem) {
+      throw new NotFoundException('Menu item not found');
+    }
+
+    const imageUrl = await this.cloudinaryService.uploadImage(
+      file,
+      `menu-items/${menuItemId}`,
+    );
+
+    return this.prisma.menuItem.update({
+      where: { id: menuItemId },
+      data: { imageUrl },
+      select: {
+        imageUrl: true,
       },
     });
   }
