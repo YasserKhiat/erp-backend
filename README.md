@@ -1,150 +1,190 @@
 # Restaurant ERP Backend
 
-Production-oriented backend API for a restaurant ERP + client ordering platform.
+Production-ready backend API for a restaurant ERP and client ordering platform.
 
-## Project Overview
+This service is fully containerized so developers can run it with Docker without installing Node.js, npm packages, or Prisma locally.
 
-This service provides:
+## What This Backend Provides
 
-- Auth and role-based access control
-- Menu/catalog management
-- Order and payment processing
-- Reservations and table management
-- Inventory and procurement workflows
-- Finance, dashboard analytics, reviews, and loyalty
+- Authentication and role-based authorization
+- Menu and category management
+- Order lifecycle and cart workflows
+- Payments and daily closing
+- Reservation and table management
+- Inventory and procurement
+- Reviews and loyalty
+- Finance and dashboard analytics
 
-Architecture summary:
+## Technologies Used
 
-- NestJS modular monolith (feature modules per domain)
-- Prisma ORM
+### Core Runtime
+
+- Node.js 20
+- TypeScript 5
+- NestJS 11
+
+### Data Layer
+
 - PostgreSQL (AWS RDS)
-- Internal event-driven side effects with NestJS EventEmitter
-- CI + security workflows (build quality, SCA, CodeQL, secret and container scanning)
+- Prisma ORM and Prisma Client
 
-## Tech Stack
+### API and Security
 
-- Node.js + TypeScript
-- NestJS
-- Prisma
-- PostgreSQL
-- Swagger (OpenAPI)
-- JWT + bcrypt
-- class-validator
+- REST API with NestJS controllers
+- Swagger/OpenAPI documentation
+- JWT authentication
+- Passport strategies and guards
+- bcrypt password hashing
+- class-validator and class-transformer for DTO validation
 
-## Local Setup
+### Architecture and Quality
+
+- Modular monolith by business domain
+- Event-driven internal workflows with NestJS EventEmitter
+- ESLint and build validation
+- CI/security workflows (lint, build, SCA, CodeQL, secret/container scanning)
+
+## Quick Start (Recommended: Docker)
 
 ### Prerequisites
 
-- Node.js 20+
-- npm 10+
-- PostgreSQL database (local or managed)
+- Docker Desktop (Windows/macOS) or Docker Engine with Compose plugin (Linux)
 
-### Environment Variables
-
-Copy `.env.example` into `.env` and set values:
-
-- `DATABASE_URL`
-- `JWT_SECRET`
-- `JWT_EXPIRES_IN`
-- `PORT`
-- `TAX_RATE`
-
-### Install and Initialize
+### 1. Clone and configure environment
 
 ```bash
-npm install
-npm run prisma:generate
-npm run prisma:migrate
-npm run prisma:seed
+git clone <repo-url>
+cd erp-backend
 ```
 
-## Docker / Containerized Setup
+Create your environment file:
 
-Run the backend in Docker without installing Node.js, npm dependencies, or Prisma tooling locally.
+- macOS/Linux:
 
-Important:
+```bash
+cp .env.example .env
+```
 
-- This repository containerizes only the backend application.
-- PostgreSQL remains hosted remotely on AWS RDS.
-- Docker Compose does not start a local PostgreSQL container.
+- Windows PowerShell:
 
-### Prerequisites
+```powershell
+Copy-Item .env.example .env
+```
 
-- Docker Desktop (Windows/macOS) or Docker Engine + Docker Compose plugin (Linux)
+Then edit .env with your real values.
 
-### Environment Configuration
+### 2. Run backend with Docker
 
-1. Copy `.env.example` to `.env`.
-2. Set real values, especially:
-	 - `DATABASE_URL` (AWS RDS connection string)
-	 - `JWT_SECRET`
-	 - `JWT_EXPIRES_IN`
-	 - `PORT`
-	 - `TAX_RATE`
+```bash
+docker compose up --build -d
+```
+
+### 3. Open the API
+
+- API root: http://localhost:3000
+- Health: http://localhost:3000/health
+- Swagger UI: http://localhost:3000/docs
+
+Notes:
+
+- This project containerizes only the backend app.
+- Database is remote (AWS RDS), not a local Docker PostgreSQL container.
+
+## Environment Variables
+
+Required values in .env:
+
+- DATABASE_URL: PostgreSQL connection string to AWS RDS
+- JWT_SECRET: JWT signing secret
+- JWT_EXPIRES_IN: token validity window (example: 1d)
+- PORT: API port (default 3000)
+- TAX_RATE: decimal tax rate (example: 0.1)
+- CLOUDINARY_CLOUD_NAME: Cloudinary cloud name
+- CLOUDINARY_API_KEY: Cloudinary API key
+- CLOUDINARY_API_SECRET: Cloudinary API secret
 
 Do not commit real secrets.
 
-### Start Backend with Docker
+## Image Upload (Cloudinary)
 
-```bash
-docker compose up --build
+Menu and ingredient images are uploaded as multipart files, stored in Cloudinary,
+and only the resulting secure URL is saved in PostgreSQL.
+
+### How It Works
+
+- Admin uploads image to `POST /menu/:id/image` or `POST /ingredients/:id/image`
+- API validates type (`image/jpeg`, `image/png`, `image/webp`) and max size (5 MB)
+- API streams image to Cloudinary using the official SDK
+- API updates `imageUrl` on the related record in PostgreSQL
+- API returns standard contract: `{ "success": true, "data": { "imageUrl": "..." } }`
+
+### Required Environment Variables
+
+- `CLOUDINARY_CLOUD_NAME`
+- `CLOUDINARY_API_KEY`
+- `CLOUDINARY_API_SECRET`
+
+### Postman Example (Menu Image)
+
+Request:
+
+- Method: `POST`
+- URL: `http://localhost:3000/menu/<menuItemId>/image`
+- Auth: `Bearer <admin_jwt>`
+- Body: `form-data`
+  - Key: `file` (type: File)
+  - Value: choose `.jpg`, `.png`, or `.webp` image <= 5 MB
+
+Expected response:
+
+```json
+{
+  "success": true,
+  "data": {
+    "imageUrl": "https://res.cloudinary.com/..."
+  }
+}
 ```
 
-or with npm helpers:
+## Docker Commands
+
+### Start / stop
 
 ```bash
-npm run docker:up
-```
-
-Backend URLs:
-
-- API base: `http://localhost:3000`
-- Swagger UI: `http://localhost:3000/docs`
-- Health: `http://localhost:3000/health`
-
-### Common Docker Commands
-
-```bash
-# Start in background
 docker compose up --build -d
-
-# View logs
-docker compose logs -f api
-
-# Stop services
 docker compose down
+```
 
-# Rebuild image without cache
+### Logs and rebuild
+
+```bash
+docker compose logs -f api
 docker compose build --no-cache api
 ```
 
-Equivalent npm helpers:
+### npm helper scripts (optional)
 
 ```bash
+npm run docker:up
 npm run docker:up:detached
 npm run docker:logs
 npm run docker:down
 npm run docker:rebuild
 ```
 
-### Prisma in Docker
+## Prisma Workflow
 
-The image runs `prisma generate` during build, so Prisma Client is available in the container.
+Prisma Client generation is part of the container build.
 
-Use explicit one-off commands for schema operations (recommended):
+Use explicit commands for DB operations:
 
 ```bash
-# Generate Prisma client
 docker compose run --rm api npm run prisma:generate
-
-# Apply committed migrations to AWS RDS
 docker compose run --rm api npm run prisma:deploy
-
-# Seed data
 docker compose run --rm api npm run prisma:seed
 ```
 
-Or with npm helpers:
+Equivalent npm helpers:
 
 ```bash
 npm run docker:prisma:generate
@@ -152,132 +192,56 @@ npm run docker:prisma:deploy
 npm run docker:prisma:seed
 ```
 
-Notes:
+Best practice:
 
-- Keep migration and seed execution explicit; they are not auto-run at container startup.
-- Prefer `prisma migrate deploy` for shared environments.
+- Keep migrations and seed as explicit commands.
+- Do not auto-run migrations on every app startup.
 
-### Onboarding Flow
+## Local Non-Docker Setup (Optional)
 
-```bash
-git clone <repo-url>
-cd erp-backend
-cp .env.example .env
-# edit .env with AWS RDS and JWT values
-docker compose up --build
-```
+Use this only if you prefer running directly on your machine.
 
-### AWS RDS Connectivity Notes
+### Prerequisites
 
-- Ensure AWS RDS security groups allow inbound traffic from your current public IP.
-- Ensure `DATABASE_URL` points to the correct host/port/database.
-- If SSL is required by your RDS setup, include required SSL parameters in `DATABASE_URL`.
+- Node.js 20+
+- npm 10+
 
-### Troubleshooting
-
-- Container starts but API cannot query DB:
-	- Verify `DATABASE_URL` and AWS network rules (security group/NACL/VPC routing).
-- `P1001` / cannot reach database:
-	- Confirm RDS instance is publicly reachable from your environment or connected through VPN/bastion.
-- Prisma schema changed but runtime errors persist:
-	- Re-run `docker compose run --rm api npm run prisma:generate`.
-- Port conflict on `3000`:
-	- Change `PORT` in `.env` and restart compose.
-
-## Running the App
+### Install and run
 
 ```bash
+npm install
+npm run prisma:generate
+npm run prisma:deploy
+npm run prisma:seed
 npm run start:dev
 ```
 
-Other common commands:
+## API Contract
+
+Main response envelopes:
+
+- Success: { "success": true, "data": ... }
+- Error: { "success": false, "error": "ERROR_CODE", "message": "..." }
+- Paginated: { "success": true, "data": [...], "meta": { "page": 1, "limit": 10, "total": 120 } }
+
+## Smoke and Validation
 
 ```bash
-npm run build
-npm run lint
 npm run test:validation
 npm run test:smoke
 ```
 
-## API Documentation
+## Troubleshooting
 
-- Swagger UI: `/docs`
-- OpenAPI JSON: `/docs-json`
-- Health: `/health`
+- Cannot connect to database (P1001):
+  - Check DATABASE_URL and AWS RDS security group inbound rules for your IP.
+- Container is up but API errors on DB operations:
+  - Verify RDS host/port/database/user/password in DATABASE_URL.
+- Prisma schema changed but app still fails:
+  - Run docker compose run --rm api npm run prisma:generate.
+- Port 3000 already in use:
+  - Change PORT in .env, then restart docker compose.
 
-Response contract notes:
+## Additional Documentation
 
-- Success envelope:
-	- `{ "success": true, "data": ... }`
-	- Optional `message` may appear.
-- Error envelope:
-	- `{ "success": false, "error": "ERROR_CODE", "message": "Human readable message" }`
-- Paginated responses:
-	- `{ "success": true, "data": [...], "meta": { "page": 1, "limit": 10, "total": 120 } }`
-
-## Seed and Demo Data
-
-`npm run prisma:seed` provisions demo data for frontend and QA use:
-
-- Demo users:
-	- `admin@restaurant.local` / `Admin123!`
-	- `manager@restaurant.local` / `Manager123!`
-	- `employee@restaurant.local` / `Employee123!`
-	- `client@restaurant.local` / `Client123!`
-- Business fixtures:
-	- Categories, menu items, formulas
-	- Dining tables, suppliers, ingredients, inventory
-	- Reservations, reviews, loyalty account + transactions
-	- Payments, expenses, and daily cash closing examples
-
-## Event-Driven Architecture
-
-Core events:
-
-- `order.confirmed`
-- `order.completed`
-- `order.cancelled`
-- `payment.completed`
-- `reservation.created`
-- `stock.low`
-- `loyalty.updated`
-
-Core listeners:
-
-- Stock listener: consumes stock when orders are confirmed
-- Payment listener: updates daily stats and emits loyalty updates
-- Loyalty listener: applies points and milestone bonuses
-- Analytics listener: updates daily order counters
-- Notification listener: logs stock low and reservation notifications
-
-## CI/CD and DevSecOps
-
-Workflows in `.github/workflows`:
-
-- `ci.yml`: install, prisma generate, lint, build, test
-- `security.yml`: gitleaks, dependency audit, dependency review, container scan
-- `codeql.yml`: static code analysis
-
-## Branch Workflow
-
-- `main`: production release branch
-- `develop`: integration branch
-- `feature/*`: feature and handoff work
-- `fix/*`: bugfix and contract hardening
-
-Release policy:
-
-1. Work in feature/fix branches
-2. Merge to `develop` only when CI is green
-3. Promote `develop` to `main` only after release readiness validation
-
-## Frontend Integration Notes
-
-For frontend-facing API usage, refer to `FRONTEND_HANDOFF.md` for:
-
-- Base URL and Swagger URL
-- Auth flow and required headers
-- Public and protected route groups
-- Pagination and query behavior
-- Role and ownership constraints
-- Example success/error payloads
+- FRONTEND_HANDOFF.md: frontend integration details and route usage

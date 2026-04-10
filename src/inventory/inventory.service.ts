@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { StockMovementType } from '../common/constants/domain-enums';
 import { OrderConfirmedEvent, StockUpdatedEvent } from '../orders/events';
@@ -19,6 +20,7 @@ export class InventoryService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly cloudinaryService: CloudinaryService,
   ) {}
 
   async createIngredient(dto: CreateIngredientDto) {
@@ -82,6 +84,37 @@ export class InventoryService {
     return this.prisma.ingredient.findMany({
       include: { inventory: true },
       orderBy: { name: 'asc' },
+    });
+  }
+
+  listIngredients() {
+    return this.prisma.ingredient.findMany({
+      include: { inventory: true },
+      orderBy: { name: 'asc' },
+    });
+  }
+
+  async uploadIngredientImage(ingredientId: string, file: Express.Multer.File) {
+    const ingredient = await this.prisma.ingredient.findUnique({
+      where: { id: ingredientId },
+      select: { id: true },
+    });
+
+    if (!ingredient) {
+      throw new NotFoundException('Ingredient not found');
+    }
+
+    const imageUrl = await this.cloudinaryService.uploadImage(
+      file,
+      `ingredients/${ingredientId}`,
+    );
+
+    return this.prisma.ingredient.update({
+      where: { id: ingredientId },
+      data: { imageUrl },
+      select: {
+        imageUrl: true,
+      },
     });
   }
 

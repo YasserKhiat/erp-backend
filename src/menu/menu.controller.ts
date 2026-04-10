@@ -6,14 +6,19 @@ import {
   Param,
   Post,
   Query,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
+  ApiBody,
+  ApiConsumes,
   ApiOperation,
   ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { paginateArray } from '../common/utils/pagination';
 import { Roles } from '../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -28,6 +33,7 @@ import { CreateFormulaBundleDto } from './dto/create-formula-bundle.dto';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { CreateMenuItemDto } from './dto/create-menu-item.dto';
 import { SetMenuItemRecipeDto } from './dto/set-menu-item-recipe.dto';
+import { imageUploadMulterOptions } from '../common/utils/image-upload.config';
 import { MenuService } from './menu.service';
 
 @ApiTags('menu')
@@ -186,6 +192,52 @@ export class MenuController {
   @ApiContractOk({ description: 'Menu item margin details.', dataSchema: { type: 'object' } })
   getMenuItemMargin(@Param('id') id: string) {
     return this.menuService.getMenuItemMargin(id);
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Get menu item details by id' })
+  @ApiContractOk({ description: 'Menu item details.', dataSchema: { type: 'object' } })
+  getMenuItemById(@Param('id') id: string) {
+    return this.menuService.getMenuItemById(id);
+  }
+
+  @Post(':id/image')
+  @ApiOperation({ summary: 'Upload menu item image (Cloudinary)' })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @UseInterceptors(FileInterceptor('file', imageUploadMulterOptions))
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['file'],
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+        },
+      },
+    },
+  })
+  @ApiContractOk({
+    description: 'Menu item image uploaded.',
+    dataSchema: {
+      type: 'object',
+      properties: {
+        imageUrl: {
+          type: 'string',
+          format: 'uri',
+        },
+      },
+      required: ['imageUrl'],
+    },
+  })
+  uploadMenuItemImage(
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    return this.menuService.uploadMenuItemImage(id, file);
   }
 
   @Delete('items/:id')

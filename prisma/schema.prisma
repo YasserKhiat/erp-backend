@@ -161,6 +161,7 @@ model MenuItem {
   id           String              @id @default(cuid())
   name         String
   description  String?
+  imageUrl     String?
   price        Decimal             @db.Decimal(10, 2)
   isAvailable  Boolean             @default(true)
   categoryId   String
@@ -246,6 +247,7 @@ model FormulaBundleItem {
 model Ingredient {
   id              String              @id @default(cuid())
   name            String              @unique
+  imageUrl        String?
   unit            String
   minStockLevel   Decimal             @db.Decimal(10, 2)
   defaultSupplierId String?
