@@ -99,6 +99,7 @@ Required values in .env:
 - JWT_EXPIRES_IN: token validity window (example: 1d)
 - PORT: API port (default 3000)
 - TAX_RATE: decimal tax rate (example: 0.1)
+- FRONTEND_ORIGINS: comma-separated allowlist for browser clients (example: http://localhost:5173,http://localhost:5174,http://localhost:3001)
 - CLOUDINARY_CLOUD_NAME: Cloudinary cloud name
 - CLOUDINARY_API_KEY: Cloudinary API key
 - CLOUDINARY_API_SECRET: Cloudinary API secret
