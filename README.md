@@ -99,8 +99,52 @@ Required values in .env:
 - JWT_EXPIRES_IN: token validity window (example: 1d)
 - PORT: API port (default 3000)
 - TAX_RATE: decimal tax rate (example: 0.1)
+- CLOUDINARY_CLOUD_NAME: Cloudinary cloud name
+- CLOUDINARY_API_KEY: Cloudinary API key
+- CLOUDINARY_API_SECRET: Cloudinary API secret
 
 Do not commit real secrets.
+
+## Image Upload (Cloudinary)
+
+Menu and ingredient images are uploaded as multipart files, stored in Cloudinary,
+and only the resulting secure URL is saved in PostgreSQL.
+
+### How It Works
+
+- Admin uploads image to `POST /menu/:id/image` or `POST /ingredients/:id/image`
+- API validates type (`image/jpeg`, `image/png`, `image/webp`) and max size (5 MB)
+- API streams image to Cloudinary using the official SDK
+- API updates `imageUrl` on the related record in PostgreSQL
+- API returns standard contract: `{ "success": true, "data": { "imageUrl": "..." } }`
+
+### Required Environment Variables
+
+- `CLOUDINARY_CLOUD_NAME`
+- `CLOUDINARY_API_KEY`
+- `CLOUDINARY_API_SECRET`
+
+### Postman Example (Menu Image)
+
+Request:
+
+- Method: `POST`
+- URL: `http://localhost:3000/menu/<menuItemId>/image`
+- Auth: `Bearer <admin_jwt>`
+- Body: `form-data`
+  - Key: `file` (type: File)
+  - Value: choose `.jpg`, `.png`, or `.webp` image <= 5 MB
+
+Expected response:
+
+```json
+{
+  "success": true,
+  "data": {
+    "imageUrl": "https://res.cloudinary.com/..."
+  }
+}
+```
 
 ## Docker Commands
 
