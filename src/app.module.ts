@@ -17,6 +17,7 @@ import { ReviewsModule } from './reviews/reviews.module';
 import { LoyaltyModule } from './loyalty/loyalty.module';
 import { FinanceModule } from './finance/finance.module';
 import { EventsModule } from './events/events.module';
+import { PersonnelModule } from './personnel/personnel.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { EventsModule } from './events/events.module';
     ReviewsModule,
     LoyaltyModule,
     FinanceModule,
+    PersonnelModule,
     PaymentsModule,
     DashboardModule,
     EventsModule,

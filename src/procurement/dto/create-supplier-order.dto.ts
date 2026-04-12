@@ -15,17 +15,23 @@ export class SupplierOrderLineDto {
   @IsString()
   ingredientId: string;
 
+  @ApiPropertyOptional({ example: 'cmncatalogitemid123' })
+  @IsOptional()
+  @IsString()
+  supplierCatalogItemId?: string;
+
   @ApiProperty({ example: 20 })
   @Type(() => Number)
   @IsNumber()
   @Min(0.01)
   quantity: number;
 
-  @ApiProperty({ example: 3.5 })
+  @ApiPropertyOptional({ example: 3.5 })
+  @IsOptional()
   @Type(() => Number)
   @IsNumber()
   @Min(0)
-  unitCost: number;
+  unitCost?: number;
 }
 
 export class CreateSupplierOrderDto {

@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
+import { MenuService } from '../menu/menu.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { StockMovementType } from '../common/constants/domain-enums';
 import { OrderConfirmedEvent, StockUpdatedEvent } from '../orders/events';
@@ -21,6 +22,7 @@ export class InventoryService {
     private readonly prisma: PrismaService,
     private readonly eventEmitter: EventEmitter2,
     private readonly cloudinaryService: CloudinaryService,
+    private readonly menuService: MenuService,
   ) {}
 
   async createIngredient(dto: CreateIngredientDto) {
@@ -76,6 +78,7 @@ export class InventoryService {
     });
 
     await this.emitLowStockIfNeeded(dto.ingredientId);
+    await this.menuService.recalculateAllMenuAvailability();
 
     return updatedInventory;
   }
@@ -240,6 +243,8 @@ export class InventoryService {
         await this.emitLowStockIfNeeded(recipeItem.ingredientId);
       }
     }
+
+    await this.menuService.recalculateAllMenuAvailability();
   }
 
   private async emitLowStockIfNeeded(ingredientId: string) {
