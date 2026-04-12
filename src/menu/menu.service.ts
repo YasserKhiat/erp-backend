@@ -27,6 +27,80 @@ export class MenuService {
     });
   }
 
+  private canProduceMenuItem(recipeLines: Array<{ quantityNeeded: Prisma.Decimal; ingredient: { inventory: { currentStock: Prisma.Decimal } | null } }>): boolean {
+    if (recipeLines.length === 0) {
+      return false;
+    }
+
+    return recipeLines.every((line) => {
+      const available = Number(line.ingredient.inventory?.currentStock ?? 0);
+      return available >= Number(line.quantityNeeded);
+    });
+  }
+
+  async recalculateMenuItemAvailability(menuItemId: string) {
+    const menuItem = await this.prisma.menuItem.findUnique({
+      where: { id: menuItemId },
+      include: {
+        ingredients: {
+          include: {
+            ingredient: {
+              include: {
+                inventory: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!menuItem) {
+      throw new NotFoundException('Menu item not found');
+    }
+
+    const isAvailable = this.canProduceMenuItem(menuItem.ingredients);
+
+    return this.prisma.menuItem.update({
+      where: { id: menuItemId },
+      data: {
+        isAvailable,
+      },
+    });
+  }
+
+  async recalculateAllMenuAvailability() {
+    const menuItems = await this.prisma.menuItem.findMany({
+      include: {
+        ingredients: {
+          include: {
+            ingredient: {
+              include: {
+                inventory: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const updates = menuItems.map((item) =>
+      this.prisma.menuItem.update({
+        where: { id: item.id },
+        data: {
+          isAvailable: this.canProduceMenuItem(item.ingredients),
+        },
+      }),
+    );
+
+    if (updates.length > 0) {
+      await this.prisma.$transaction(updates);
+    }
+
+    return {
+      updated: updates.length,
+    };
+  }
+
   createMenuItem(dto: CreateMenuItemDto) {
     return this.prisma.menuItem.create({
       data: {
@@ -164,6 +238,8 @@ export class MenuService {
         })),
       }),
     ]);
+
+    await this.recalculateMenuItemAvailability(menuItemId);
 
     return this.getMenuItemRecipe(menuItemId);
   }

@@ -104,3 +104,46 @@ export const ExpenseCategory = {
 
 export type ExpenseCategory =
   (typeof ExpenseCategory)[keyof typeof ExpenseCategory];
+
+export const EmploymentStatus = {
+  ACTIVE: 'ACTIVE',
+  INACTIVE: 'INACTIVE',
+  TERMINATED: 'TERMINATED',
+} as const;
+
+export type EmploymentStatus =
+  (typeof EmploymentStatus)[keyof typeof EmploymentStatus];
+
+export const ContractType = {
+  CDI: 'CDI',
+  CDD: 'CDD',
+  FREELANCE: 'FREELANCE',
+  INTERNSHIP: 'INTERNSHIP',
+} as const;
+
+export type ContractType = (typeof ContractType)[keyof typeof ContractType];
+
+export const AttendanceStatus = {
+  PRESENT: 'PRESENT',
+  LATE: 'LATE',
+  ABSENT: 'ABSENT',
+} as const;
+
+export type AttendanceStatus =
+  (typeof AttendanceStatus)[keyof typeof AttendanceStatus];
+
+export const AbsenceStatus = {
+  PENDING: 'PENDING',
+  APPROVED: 'APPROVED',
+  REJECTED: 'REJECTED',
+} as const;
+
+export type AbsenceStatus = (typeof AbsenceStatus)[keyof typeof AbsenceStatus];
+
+export const BankMovementType = {
+  CREDIT: 'CREDIT',
+  DEBIT: 'DEBIT',
+} as const;
+
+export type BankMovementType =
+  (typeof BankMovementType)[keyof typeof BankMovementType];
