@@ -103,6 +103,13 @@ Required values in .env:
 - CLOUDINARY_CLOUD_NAME: Cloudinary cloud name
 - CLOUDINARY_API_KEY: Cloudinary API key
 - CLOUDINARY_API_SECRET: Cloudinary API secret
+- MAIL_MODE: `log` (default) or `smtp`
+- MAIL_FROM: sender address for notifications
+- SMTP_HOST: SMTP server host (required in `smtp` mode)
+- SMTP_PORT: SMTP server port (default `587`)
+- SMTP_USER: SMTP username (required in `smtp` mode)
+- SMTP_PASS: SMTP password (required in `smtp` mode)
+- SMTP_SECURE: `true` for SMTPS/465, else `false`
 
 Do not commit real secrets.
 
@@ -224,6 +231,14 @@ Main response envelopes:
 - Success: { "success": true, "data": ... }
 - Error: { "success": false, "error": "ERROR_CODE", "message": "..." }
 - Paginated: { "success": true, "data": [...], "meta": { "page": 1, "limit": 10, "total": 120 } }
+
+## Client Portal Highlights
+
+- Menu filtering supports `availableOnly`, `categoryId`, `search`, `vegetarian`, `halal`, and `glutenFree`.
+- Cart supports add, clear, update line quantity, and remove single line before checkout.
+- Order confirmation and reservation confirmation/reminder emails are event-driven and non-blocking.
+- Mail delivery supports `log` mode for development and `smtp` mode for production.
+- Loyalty can auto-apply a checkout discount when the client has enough points (can be opted out per order request).
 
 ## Smoke and Validation
 

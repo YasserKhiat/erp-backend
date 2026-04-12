@@ -109,6 +109,9 @@ export class MenuService {
         price: dto.price,
         categoryId: dto.categoryId,
         isAvailable: dto.isAvailable ?? true,
+        vegetarian: dto.vegetarian ?? false,
+        halal: dto.halal ?? false,
+        glutenFree: dto.glutenFree ?? false,
       },
     });
   }
@@ -126,11 +129,17 @@ export class MenuService {
 
   getMenu(filters: {
     availableOnly?: boolean;
+    vegetarian?: boolean;
+    halal?: boolean;
+    glutenFree?: boolean;
     categoryId?: string;
     search?: string;
   }) {
     const where: Prisma.MenuItemWhereInput = {
       ...(filters.availableOnly ? { isAvailable: true } : {}),
+      ...(filters.vegetarian ? { vegetarian: true } : {}),
+      ...(filters.halal ? { halal: true } : {}),
+      ...(filters.glutenFree ? { glutenFree: true } : {}),
       ...(filters.categoryId ? { categoryId: filters.categoryId } : {}),
       ...(filters.search
         ? {

@@ -1,6 +1,7 @@
-import { IsEnum, IsInt, IsOptional, IsString, Min } from 'class-validator';
+import { IsBoolean, IsEnum, IsInt, IsOptional, IsString, Min } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { OrderType } from '../../common/constants/domain-enums';
+import { Type } from 'class-transformer';
 
 export class PlaceOrderDto {
   @ApiProperty({ enum: OrderType, example: OrderType.DELIVERY })
@@ -22,4 +23,10 @@ export class PlaceOrderDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @ApiPropertyOptional({ example: true, default: true })
+  @IsOptional()
+  @Type(() => Boolean)
+  @IsBoolean()
+  applyLoyaltyAuto?: boolean;
 }

@@ -3,9 +3,15 @@ export interface OrderCreatedEvent {
     id: string;
     orderNumber: number;
     customerId?: string;
+    orderType: string;
+    status: string;
+    loyaltyDiscount: number;
     total: number;
     items: Array<{
       menuItemId: string;
+      menuItemName: string;
+      unitPrice: number;
+      lineTotal: number;
       quantity: number;
     }>;
   };
@@ -27,9 +33,15 @@ export interface OrderConfirmedEvent {
     id: string;
     orderNumber: number;
     customerId?: string;
+    orderType: string;
+    status: string;
+    loyaltyDiscount: number;
     total: number;
     items: Array<{
       menuItemId: string;
+      menuItemName: string;
+      unitPrice: number;
+      lineTotal: number;
       quantity: number;
     }>;
   };

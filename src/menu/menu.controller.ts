@@ -48,6 +48,9 @@ export class MenuController {
     description: 'Primary frontend menu endpoint with optional filters.',
   })
   @ApiQuery({ name: 'availableOnly', required: false, type: Boolean })
+  @ApiQuery({ name: 'vegetarian', required: false, type: Boolean })
+  @ApiQuery({ name: 'halal', required: false, type: Boolean })
+  @ApiQuery({ name: 'glutenFree', required: false, type: Boolean })
   @ApiQuery({ name: 'categoryId', required: false, type: String })
   @ApiQuery({ name: 'search', required: false, type: String })
   @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
@@ -55,6 +58,9 @@ export class MenuController {
   @ApiContractListOk({ description: 'Paginated menu items list.' })
   getMenu(
     @Query('availableOnly') availableOnly?: string,
+    @Query('vegetarian') vegetarian?: string,
+    @Query('halal') halal?: string,
+    @Query('glutenFree') glutenFree?: string,
     @Query('categoryId') categoryId?: string,
     @Query('search') search?: string,
     @Query('page') page?: string,
@@ -63,6 +69,9 @@ export class MenuController {
     return this.menuService
       .getMenu({
         availableOnly: availableOnly === 'true',
+        vegetarian: vegetarian === 'true',
+        halal: halal === 'true',
+        glutenFree: glutenFree === 'true',
         categoryId,
         search,
       })
@@ -90,6 +99,9 @@ export class MenuController {
   @Get('items')
   @ApiOperation({ summary: 'Browse menu items (legacy alias)' })
   @ApiQuery({ name: 'availableOnly', required: false, type: Boolean })
+  @ApiQuery({ name: 'vegetarian', required: false, type: Boolean })
+  @ApiQuery({ name: 'halal', required: false, type: Boolean })
+  @ApiQuery({ name: 'glutenFree', required: false, type: Boolean })
   @ApiQuery({ name: 'categoryId', required: false, type: String })
   @ApiQuery({ name: 'search', required: false, type: String })
   @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
@@ -97,6 +109,9 @@ export class MenuController {
   @ApiContractListOk({ description: 'Paginated legacy menu items list.' })
   getItems(
     @Query('availableOnly') availableOnly?: string,
+    @Query('vegetarian') vegetarian?: string,
+    @Query('halal') halal?: string,
+    @Query('glutenFree') glutenFree?: string,
     @Query('categoryId') categoryId?: string,
     @Query('search') search?: string,
     @Query('page') page?: string,
@@ -105,6 +120,9 @@ export class MenuController {
     return this.menuService
       .getMenu({
         availableOnly: availableOnly === 'true',
+        vegetarian: vegetarian === 'true',
+        halal: halal === 'true',
+        glutenFree: glutenFree === 'true',
         categoryId,
         search,
       })
