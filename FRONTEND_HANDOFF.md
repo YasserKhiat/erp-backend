@@ -139,6 +139,13 @@ Only list endpoints return `meta`.
 - `GET /payments/me`
 - `GET /payments/order/:orderId` (ownership enforced)
 
+### Notifications
+
+- `GET /notifications/me`
+- `GET /notifications/me/unread-count`
+- `PATCH /notifications/:id/read`
+- `PATCH /notifications/me/read-all`
+
 ## 7) Important Response Shape Notes
 
 These are the most common frontend mapping errors.
@@ -176,6 +183,32 @@ Frontend should map `data[].menuItem` before rendering as menu cards.
 May return `null` if user has never set preferences.
 UI should handle null and show empty form defaults.
 
+### Notifications payload (`GET /notifications/me`)
+
+Returns paginated rows sorted by newest first.
+
+```json
+{
+  "id": "notif_xxx",
+  "type": "ORDER",
+  "priority": "INFO",
+  "title": "Order #102 confirmed",
+  "message": "Order 102 is confirmed and ready for preparation flow.",
+  "isRead": false,
+  "createdAt": "2026-04-13T09:00:00.000Z",
+  "actionUrl": "/orders/clx_order_id",
+  "metadata": {
+    "orderId": "clx_order_id",
+    "orderNumber": 102
+  }
+}
+```
+
+`GET /notifications/me/unread-count` returns `{ count: number }`.
+
+`PATCH /notifications/:id/read` marks only the current user's recipient row.
+`PATCH /notifications/me/read-all` marks all unread rows for the current user.
+
 ## 8) Critical Business Constraints for Client UX
 
 - Checkout can fail with `MISSING_RECIPE` if a dish has no recipe.
@@ -185,6 +218,8 @@ UI should handle null and show empty form defaults.
 - Payment totals cannot exceed order remaining amount.
 - Loyalty redemption requires sufficient points.
 - Reservation transitions and edit/cancel rules are validated server-side.
+- Notifications are generated from domain events (order/payment/reservation/stock/loyalty),
+  so frontend should poll `/notifications/me` and unread count instead of assuming synchronous creation in request handlers.
 
 ## 9) Seeded Accounts
 
@@ -215,6 +250,7 @@ After `npm run prisma:seed`:
 5. Use `/menu` with `availableOnly=true` for client storefront.
 6. Validate and show server `error` code plus `message` on failures.
 7. Confirm all protected calls include JWT bearer token.
+8. Poll notifications list + unread count and update local read state after mark-read calls.
 
 ## 12) Source of Truth
 

@@ -13,6 +13,7 @@ This service is fully containerized so developers can run it with Docker without
 - Reservation and table management
 - Inventory and procurement
 - Reviews and loyalty
+- In-app role-based notifications with per-user read state
 - Finance and dashboard analytics
 
 ## Technologies Used
@@ -237,6 +238,12 @@ Main response envelopes:
 - Menu filtering supports `availableOnly`, `categoryId`, `search`, `vegetarian`, `halal`, and `glutenFree`.
 - Cart supports add, clear, update line quantity, and remove single line before checkout.
 - Order confirmation and reservation confirmation/reminder emails are event-driven and non-blocking.
+- In-app notifications are also event-driven (`order.confirmed`, `payment.completed`, `reservation.created`, `stock.low`, `loyalty.updated`) and persisted per recipient.
+- Notification API for authenticated users:
+  - `GET /notifications/me`
+  - `GET /notifications/me/unread-count`
+  - `PATCH /notifications/:id/read`
+  - `PATCH /notifications/me/read-all`
 - Mail delivery supports `log` mode for development and `smtp` mode for production.
 - Loyalty can auto-apply a checkout discount when the client has enough points (can be opted out per order request).
 
