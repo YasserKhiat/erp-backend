@@ -12,6 +12,7 @@ import {
   ApiBearerAuth,
   ApiBody,
   ApiOperation,
+  ApiUnauthorizedResponse,
   ApiTags,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -20,6 +21,7 @@ import { UserRole } from '../common/constants/domain-enums';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
 import { ApiContractErrors, ApiContractOk } from '../common/swagger/api-contract.decorators';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import { CreateClientAddressDto } from './dto/create-client-address.dto';
 import { FavoriteMenuItemDto } from './dto/favorite-menu-item.dto';
 import { UpdateClientPreferencesDto } from './dto/update-client-preferences.dto';
@@ -33,6 +35,21 @@ import { UsersService } from './users.service';
 @Controller('clients/me')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
+
+  @Patch('password')
+  @ApiOperation({ summary: 'Change my account password' })
+  @ApiBody({ type: ChangePasswordDto })
+  @ApiContractOk({
+    description: 'Password updated successfully.',
+    dataSchema: { type: 'null' },
+  })
+  @ApiUnauthorizedResponse({ description: 'JWT token is missing or invalid.' })
+  changeMyPassword(
+    @CurrentUser() user: { id: string },
+    @Body() dto: ChangePasswordDto,
+  ) {
+    return this.usersService.changeOwnPassword(user.id, dto);
+  }
 
   @Get('addresses')
   @ApiOperation({ summary: 'List my saved addresses' })
