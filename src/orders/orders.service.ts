@@ -11,6 +11,7 @@ import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../prisma/prisma.service';
 import {
+  LoyaltyTransactionType,
   OrderStatus,
   OrderType,
   TableStatus,
@@ -19,6 +20,7 @@ import {
 import { AddCartItemDto } from './dto/add-cart-item.dto';
 import { PlaceOrderDto } from './dto/place-order.dto';
 import { RemoveOrderItemDto } from './dto/remove-order-item.dto';
+import { UpdateCartItemDto } from './dto/update-cart-item.dto';
 import { UpdateOrderItemDto } from './dto/update-order-item.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import {
@@ -31,6 +33,8 @@ import {
 @Injectable()
 export class OrdersService {
   private readonly logger = new Logger(OrdersService.name);
+  private readonly loyaltyRewardCostPoints = 100;
+  private readonly loyaltyRewardDiscountAmount = 10;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -155,20 +159,49 @@ export class OrdersService {
     id: string;
     orderNumber: number;
     customerId?: string | null;
+    orderType: string;
+    status: string;
+    loyaltyDiscount: Prisma.Decimal;
     total: Prisma.Decimal;
-    items: Array<{ menuItemId: string; quantity: number }>;
+    items: Array<{
+      menuItemId: string;
+      quantity: number;
+      unitPrice: Prisma.Decimal;
+      totalPrice: Prisma.Decimal;
+      menuItem?: { name: string };
+    }>;
   }): OrderCreatedEvent {
     return {
       order: {
         id: order.id,
         orderNumber: order.orderNumber,
         customerId: order.customerId ?? undefined,
+        orderType: order.orderType,
+        status: order.status,
+        loyaltyDiscount: Number(order.loyaltyDiscount),
         total: Number(order.total),
         items: order.items.map((item) => ({
           menuItemId: item.menuItemId,
+          menuItemName: item.menuItem?.name ?? 'Unknown item',
+          unitPrice: Number(item.unitPrice),
+          lineTotal: Number(item.totalPrice),
           quantity: item.quantity,
         })),
       },
+    };
+  }
+
+  private buildCartSummary(items: Array<{ quantity: number; menuItem: { price: Prisma.Decimal } }>) {
+    const subtotal = this.roundMoney(
+      items.reduce((acc, item) => acc + Number(item.menuItem.price) * item.quantity, 0),
+    );
+    const tax = this.roundMoney(subtotal * this.getTaxRate());
+    const total = this.roundMoney(subtotal + tax);
+
+    return {
+      subtotal,
+      tax,
+      total,
     };
   }
 
@@ -222,7 +255,7 @@ export class OrdersService {
 
   async getCart(userId: string) {
     const cart = await this.getOrCreateActiveCart(userId);
-    return this.prisma.cart.findUnique({
+    const fullCart = await this.prisma.cart.findUnique({
       where: { id: cart.id },
       include: {
         items: {
@@ -232,6 +265,15 @@ export class OrdersService {
         },
       },
     });
+
+    if (!fullCart) {
+      return null;
+    }
+
+    return {
+      ...fullCart,
+      summary: this.buildCartSummary(fullCart.items),
+    };
   }
 
   async addCartItem(userId: string, dto: AddCartItemDto) {
@@ -272,6 +314,51 @@ export class OrdersService {
     await this.prisma.cartItem.deleteMany({
       where: { cartId: cart.id },
     });
+    return this.getCart(userId);
+  }
+
+  async updateCartItem(userId: string, cartItemId: string, dto: UpdateCartItemDto) {
+    const cart = await this.getOrCreateActiveCart(userId);
+
+    const item = await this.prisma.cartItem.findFirst({
+      where: {
+        id: cartItemId,
+        cartId: cart.id,
+      },
+      select: { id: true },
+    });
+
+    if (!item) {
+      throw new NotFoundException('Cart item not found');
+    }
+
+    await this.prisma.cartItem.update({
+      where: { id: cartItemId },
+      data: { quantity: dto.quantity },
+    });
+
+    return this.getCart(userId);
+  }
+
+  async removeCartItem(userId: string, cartItemId: string) {
+    const cart = await this.getOrCreateActiveCart(userId);
+
+    const item = await this.prisma.cartItem.findFirst({
+      where: {
+        id: cartItemId,
+        cartId: cart.id,
+      },
+      select: { id: true },
+    });
+
+    if (!item) {
+      throw new NotFoundException('Cart item not found');
+    }
+
+    await this.prisma.cartItem.delete({
+      where: { id: cartItemId },
+    });
+
     return this.getCart(userId);
   }
 
@@ -320,16 +407,37 @@ export class OrdersService {
       }
     }
 
-    const subtotal = this.roundMoney(
+    const baseSubtotal = this.roundMoney(
       cart.items.reduce(
         (acc, item) => acc + Number(item.menuItem.price) * item.quantity,
         0,
       ),
     );
-    const tax = this.roundMoney(subtotal * this.getTaxRate());
-    const total = this.roundMoney(subtotal + tax);
 
     const order = await this.prisma.$transaction(async (tx) => {
+      let loyaltyDiscount = 0;
+      let loyaltyAutoApplied = false;
+      let loyaltyAccountId: string | undefined;
+
+      if (user.role === UserRole.CLIENT && dto.applyLoyaltyAuto !== false) {
+        const account = await tx.loyaltyAccount.findUnique({
+          where: {
+            userId: user.id,
+          },
+        });
+
+        if (account && account.points >= this.loyaltyRewardCostPoints) {
+          loyaltyDiscount = Math.min(this.loyaltyRewardDiscountAmount, baseSubtotal);
+          loyaltyAutoApplied = loyaltyDiscount > 0;
+          loyaltyAccountId = account.id;
+        }
+      }
+
+      const subtotal = baseSubtotal;
+      const taxable = Math.max(0, this.roundMoney(subtotal - loyaltyDiscount));
+      const tax = this.roundMoney(taxable * this.getTaxRate());
+      const total = this.roundMoney(taxable + tax);
+
       const created = await tx.order.create({
         data: {
           customerId: user.role === UserRole.CLIENT ? user.id : undefined,
@@ -340,6 +448,8 @@ export class OrdersService {
           tableId: dto.tableId,
           notes: dto.notes,
           subtotal,
+          loyaltyDiscount,
+          loyaltyAutoApplied,
           tax,
           total,
           items: {
@@ -354,9 +464,41 @@ export class OrdersService {
           },
         },
         include: {
-          items: true,
+          items: {
+            include: {
+              menuItem: {
+                select: {
+                  name: true,
+                },
+              },
+            },
+          },
         },
       });
+
+      if (loyaltyAutoApplied && loyaltyAccountId) {
+        const updated = await tx.loyaltyAccount.update({
+          where: { id: loyaltyAccountId },
+          data: {
+            points: {
+              decrement: this.loyaltyRewardCostPoints,
+            },
+          },
+        });
+
+        await tx.loyaltyTransaction.create({
+          data: {
+            accountId: loyaltyAccountId,
+            userId: user.id,
+            orderId: created.id,
+            type: LoyaltyTransactionType.REDEEM_REWARD,
+            pointsDelta: -this.loyaltyRewardCostPoints,
+            balanceAfter: updated.points,
+            reason: `Automatic checkout reward for order #${created.orderNumber}`,
+            referenceKey: `auto-redeem:${created.id}`,
+          },
+        });
+      }
 
       if (dto.orderType === OrderType.DINE_IN && dto.tableId) {
         await tx.diningTable.update({

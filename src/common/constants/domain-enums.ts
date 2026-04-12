@@ -147,3 +147,10 @@ export const BankMovementType = {
 
 export type BankMovementType =
   (typeof BankMovementType)[keyof typeof BankMovementType];
+
+export const ReviewType = {
+  DISH: 'DISH',
+  SERVICE: 'SERVICE',
+} as const;
+
+export type ReviewType = (typeof ReviewType)[keyof typeof ReviewType];

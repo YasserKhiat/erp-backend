@@ -27,6 +27,7 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { AddCartItemDto } from './dto/add-cart-item.dto';
 import { PlaceOrderDto } from './dto/place-order.dto';
 import { RemoveOrderItemDto } from './dto/remove-order-item.dto';
+import { UpdateCartItemDto } from './dto/update-cart-item.dto';
 import { UpdateOrderItemDto } from './dto/update-order-item.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import {
@@ -65,6 +66,28 @@ export class OrdersController {
   @ApiContractOk({ description: 'Active cart cleared.', dataSchema: { type: 'object' } })
   clearCart(@CurrentUser() user: { id: string }) {
     return this.ordersService.clearCart(user.id);
+  }
+
+  @Patch('cart/items/:cartItemId')
+  @ApiOperation({ summary: 'Update quantity for one cart item' })
+  @ApiBody({ type: UpdateCartItemDto })
+  @ApiContractOk({ description: 'Cart item quantity updated.', dataSchema: { type: 'object' } })
+  updateCartItem(
+    @CurrentUser() user: { id: string },
+    @Param('cartItemId') cartItemId: string,
+    @Body() dto: UpdateCartItemDto,
+  ) {
+    return this.ordersService.updateCartItem(user.id, cartItemId, dto);
+  }
+
+  @Delete('cart/items/:cartItemId')
+  @ApiOperation({ summary: 'Remove one cart item' })
+  @ApiContractOk({ description: 'Cart item removed.', dataSchema: { type: 'object' } })
+  removeCartItem(
+    @CurrentUser() user: { id: string },
+    @Param('cartItemId') cartItemId: string,
+  ) {
+    return this.ordersService.removeCartItem(user.id, cartItemId);
   }
 
   @Post()
