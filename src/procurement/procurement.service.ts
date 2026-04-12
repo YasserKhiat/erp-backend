@@ -10,15 +10,20 @@ import {
   StockMovementType,
   SupplierOrderStatus,
 } from '../common/constants/domain-enums';
+import { MenuService } from '../menu/menu.service';
 import { CreateSupplierOrderDto } from './dto/create-supplier-order.dto';
+import { CreateSupplierCatalogItemDto } from './dto/create-supplier-catalog-item.dto';
 import { CreateSupplierDto } from './dto/create-supplier.dto';
+import { ListProcurementCatalogQueryDto } from './dto/list-procurement-catalog-query.dto';
 import { UpdateSupplierOrderStatusDto } from './dto/update-supplier-order-status.dto';
+import { UpdateSupplierCatalogItemDto } from './dto/update-supplier-catalog-item.dto';
 
 @Injectable()
 export class ProcurementService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly menuService: MenuService,
   ) {}
 
   createSupplier(dto: CreateSupplierDto) {
@@ -58,10 +63,50 @@ export class ProcurementService {
       throw new BadRequestException('One or more ingredients are invalid');
     }
 
-    const totalAmount = dto.items.reduce(
-      (acc, item) => acc + item.quantity * item.unitCost,
-      0,
-    );
+    const catalogIds = dto.items
+      .map((item) => item.supplierCatalogItemId)
+      .filter((id): id is string => Boolean(id));
+
+    const catalogItems = catalogIds.length
+      ? await this.prisma.supplierCatalogItem.findMany({
+          where: {
+            id: {
+              in: catalogIds,
+            },
+            supplierId: dto.supplierId,
+            isActive: true,
+          },
+        })
+      : [];
+
+    const catalogMap = new Map(catalogItems.map((item) => [item.id, item]));
+
+    const resolvedItems = dto.items.map((item) => {
+      const catalog = item.supplierCatalogItemId
+        ? catalogMap.get(item.supplierCatalogItemId)
+        : undefined;
+
+      const resolvedUnitCost =
+        item.unitCost !== undefined ? item.unitCost : Number(catalog?.unitPrice ?? 0);
+
+      if (resolvedUnitCost <= 0) {
+        throw new BadRequestException('INVALID_INPUT');
+      }
+
+      if (catalog && catalog.ingredientId !== item.ingredientId) {
+        throw new BadRequestException('INVALID_INPUT');
+      }
+
+      return {
+        ingredientId: item.ingredientId,
+        supplierCatalogItemId: item.supplierCatalogItemId,
+        quantity: item.quantity,
+        unitCost: resolvedUnitCost,
+        lineTotal: item.quantity * resolvedUnitCost,
+      };
+    });
+
+    const totalAmount = resolvedItems.reduce((acc, item) => acc + item.lineTotal, 0);
 
     return this.prisma.supplierOrder.create({
       data: {
@@ -70,12 +115,7 @@ export class ProcurementService {
         status: SupplierOrderStatus.DRAFT,
         totalAmount,
         items: {
-          create: dto.items.map((item) => ({
-            ingredientId: item.ingredientId,
-            quantity: item.quantity,
-            unitCost: item.unitCost,
-            lineTotal: item.quantity * item.unitCost,
-          })),
+          create: resolvedItems,
         },
       },
       include: {
@@ -96,10 +136,131 @@ export class ProcurementService {
         items: {
           include: {
             ingredient: true,
+            supplierCatalogItem: true,
           },
         },
       },
       orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async listSupplierCatalogBySupplier(supplierId: string) {
+    const supplier = await this.prisma.supplier.findUnique({
+      where: { id: supplierId },
+      select: { id: true },
+    });
+
+    if (!supplier) {
+      throw new NotFoundException('Supplier not found');
+    }
+
+    return this.prisma.supplierCatalogItem.findMany({
+      where: {
+        supplierId,
+      },
+      include: {
+        ingredient: true,
+      },
+      orderBy: {
+        ingredient: {
+          name: 'asc',
+        },
+      },
+    });
+  }
+
+  async createSupplierCatalogItem(
+    supplierId: string,
+    dto: CreateSupplierCatalogItemDto,
+  ) {
+    const [supplier, ingredient] = await Promise.all([
+      this.prisma.supplier.findUnique({
+        where: { id: supplierId },
+        select: { id: true },
+      }),
+      this.prisma.ingredient.findUnique({
+        where: { id: dto.ingredientId },
+        select: { id: true },
+      }),
+    ]);
+
+    if (!supplier || !ingredient) {
+      throw new BadRequestException('INVALID_INPUT');
+    }
+
+    return this.prisma.supplierCatalogItem.create({
+      data: {
+        supplierId,
+        ingredientId: dto.ingredientId,
+        supplierSku: dto.supplierSku,
+        unit: dto.unit,
+        leadTimeDays: dto.leadTimeDays,
+        unitPrice: dto.unitPrice,
+        isActive: dto.isActive ?? true,
+      },
+      include: {
+        ingredient: true,
+      },
+    });
+  }
+
+  async updateSupplierCatalogItem(
+    supplierId: string,
+    catalogItemId: string,
+    dto: UpdateSupplierCatalogItemDto,
+  ) {
+    const item = await this.prisma.supplierCatalogItem.findFirst({
+      where: {
+        id: catalogItemId,
+        supplierId,
+      },
+      select: { id: true },
+    });
+
+    if (!item) {
+      throw new NotFoundException('Catalog item not found');
+    }
+
+    if (dto.ingredientId) {
+      const ingredient = await this.prisma.ingredient.findUnique({
+        where: { id: dto.ingredientId },
+        select: { id: true },
+      });
+      if (!ingredient) {
+        throw new BadRequestException('INVALID_INPUT');
+      }
+    }
+
+    return this.prisma.supplierCatalogItem.update({
+      where: {
+        id: catalogItemId,
+      },
+      data: {
+        ...(dto.ingredientId !== undefined ? { ingredientId: dto.ingredientId } : {}),
+        ...(dto.supplierSku !== undefined ? { supplierSku: dto.supplierSku } : {}),
+        ...(dto.unit !== undefined ? { unit: dto.unit } : {}),
+        ...(dto.leadTimeDays !== undefined ? { leadTimeDays: dto.leadTimeDays } : {}),
+        ...(dto.unitPrice !== undefined ? { unitPrice: dto.unitPrice } : {}),
+        ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
+      },
+      include: {
+        ingredient: true,
+      },
+    });
+  }
+
+  async listProcurementCatalog(query: ListProcurementCatalogQueryDto) {
+    return this.prisma.supplierCatalogItem.findMany({
+      where: {
+        ...(query.supplierId ? { supplierId: query.supplierId } : {}),
+        ...(query.ingredientId ? { ingredientId: query.ingredientId } : {}),
+        ...(query.activeOnly ? { isActive: true } : {}),
+      },
+      include: {
+        supplier: true,
+        ingredient: true,
+      },
+      orderBy: [{ supplier: { name: 'asc' } }, { ingredient: { name: 'asc' } }],
     });
   }
 
@@ -198,6 +359,8 @@ export class ProcurementService {
       supplierOrderId,
     });
 
+    await this.menuService.recalculateAllMenuAvailability();
+
     return this.prisma.supplierOrder.findUnique({
       where: { id: supplierOrderId },
       include: {
@@ -205,6 +368,7 @@ export class ProcurementService {
         items: {
           include: {
             ingredient: true,
+            supplierCatalogItem: true,
           },
         },
       },

@@ -30,6 +30,9 @@ import { CloseDailyCashDto } from './dto/close-daily-cash.dto';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { CreateMixedPaymentDto } from './dto/create-mixed-payment.dto';
 import { PaymentsService } from './payments.service';
+import { ListPaymentsQueryDto } from './dto/list-payments-query.dto';
+import { CreateBankMovementDto } from './dto/create-bank-movement.dto';
+import { RunReconciliationDto } from './dto/run-reconciliation.dto';
 
 @ApiTags('payments')
 @ApiBearerAuth()
@@ -69,9 +72,12 @@ export class PaymentsController {
   @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
   @ApiContractListOk({ description: 'Paginated payment transactions history.' })
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  getTransactions(@Query() pagination?: PaginationQueryDto) {
+  getTransactions(
+    @Query() pagination?: PaginationQueryDto,
+    @Query() query?: ListPaymentsQueryDto,
+  ) {
     return this.paymentsService
-      .getTransactions()
+      .getTransactions(query)
       .then((items) => paginateArray(items, pagination));
   }
 
@@ -83,10 +89,11 @@ export class PaymentsController {
   @Roles(UserRole.CLIENT)
   getMyTransactions(
     @CurrentUser() user: { id: string },
+    @Query() query?: ListPaymentsQueryDto,
     @Query() pagination?: PaginationQueryDto,
   ) {
     return this.paymentsService
-      .getMyTransactions(user.id)
+      .getMyTransactions(user.id, query)
       .then((items) => paginateArray(items, pagination));
   }
 
@@ -130,7 +137,37 @@ export class PaymentsController {
   @ApiOperation({ summary: 'Treasury inflow summary for a period' })
   @ApiContractOk({ description: 'Treasury summary for period.', dataSchema: { type: 'object' } })
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  getTreasurySummary(@Query('from') from?: string, @Query('to') to?: string) {
-    return this.paymentsService.getTreasurySummary(from, to);
+  getTreasurySummary(
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query() filters?: ListPaymentsQueryDto,
+  ) {
+    return this.paymentsService.getTreasurySummary(from, to, filters);
+  }
+
+  @Get('reconciliation')
+  @ApiOperation({ summary: 'Reconciliation summary and recent sessions' })
+  @ApiContractOk({ description: 'Reconciliation summary.', dataSchema: { type: 'object' } })
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  getReconciliation(@Query('from') from?: string, @Query('to') to?: string) {
+    return this.paymentsService.getReconciliationSummary(from, to);
+  }
+
+  @Post('reconciliation/bank-movement')
+  @ApiOperation({ summary: 'Create bank movement entry for reconciliation' })
+  @ApiBody({ type: CreateBankMovementDto })
+  @ApiContractOk({ description: 'Bank movement created.', dataSchema: { type: 'object' } })
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  createBankMovement(@Body() dto: CreateBankMovementDto) {
+    return this.paymentsService.createBankMovement(dto);
+  }
+
+  @Post('reconciliation/run')
+  @ApiOperation({ summary: 'Run reconciliation session for period' })
+  @ApiBody({ type: RunReconciliationDto })
+  @ApiContractOk({ description: 'Reconciliation run completed.', dataSchema: { type: 'object' } })
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  runReconciliation(@Body() dto: RunReconciliationDto) {
+    return this.paymentsService.runReconciliation(dto);
   }
 }

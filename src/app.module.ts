@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { EventEmitterModule } from '@nestjs/event-emitter';
+import { ScheduleModule } from '@nestjs/schedule';
 import { AppController } from './app.controller';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
@@ -17,6 +18,8 @@ import { ReviewsModule } from './reviews/reviews.module';
 import { LoyaltyModule } from './loyalty/loyalty.module';
 import { FinanceModule } from './finance/finance.module';
 import { EventsModule } from './events/events.module';
+import { PersonnelModule } from './personnel/personnel.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -25,6 +28,7 @@ import { EventsModule } from './events/events.module';
       envFilePath: '.env',
     }),
     EventEmitterModule.forRoot(),
+    ScheduleModule.forRoot(),
     PrismaModule,
     UsersModule,
     AuthModule,
@@ -37,8 +41,10 @@ import { EventsModule } from './events/events.module';
     ReviewsModule,
     LoyaltyModule,
     FinanceModule,
+    PersonnelModule,
     PaymentsModule,
     DashboardModule,
+    NotificationsModule,
     EventsModule,
   ],
   controllers: [AppController],

@@ -1,0 +1,718 @@
+Project ERP_Backend {
+  database_type: "PostgreSQL"
+  Note: "Generated from prisma/schema.prisma on 2026-04-12"
+}
+
+Enum UserRole {
+  ADMIN
+  MANAGER
+  EMPLOYEE
+  CLIENT
+}
+
+Enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PREPARING
+  READY
+  SERVED
+  BILLED
+  OUT_FOR_DELIVERY
+  DELIVERED
+  COMPLETED
+  CANCELLED
+}
+
+Enum TableStatus {
+  AVAILABLE
+  OCCUPIED
+  RESERVED
+}
+
+Enum OrderType {
+  DINE_IN
+  TAKEAWAY
+  DELIVERY
+}
+
+Enum PaymentMethod {
+  CASH
+  CARD
+  TRANSFER
+}
+
+Enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+Enum StockMovementType {
+  IN
+  OUT
+  ADJUSTMENT
+}
+
+Enum SupplierOrderStatus {
+  DRAFT
+  SUBMITTED
+  PARTIALLY_RECEIVED
+  RECEIVED
+  CANCELLED
+}
+
+Enum ReservationStatus {
+  PENDING
+  CONFIRMED
+  SEATED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+Enum LoyaltyTransactionType {
+  EARN_ORDER
+  BONUS_MILESTONE
+  REDEEM_REWARD
+  MANUAL_ADJUSTMENT
+}
+
+Enum ExpenseCategory {
+  FIXED
+  VARIABLE
+}
+
+Enum EmploymentStatus {
+  ACTIVE
+  INACTIVE
+  TERMINATED
+}
+
+Enum ContractType {
+  CDI
+  CDD
+  FREELANCE
+  INTERNSHIP
+}
+
+Enum AttendanceStatus {
+  PRESENT
+  LATE
+  ABSENT
+}
+
+Enum AbsenceStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+Enum BankMovementType {
+  CREDIT
+  DEBIT
+}
+
+Enum ReviewType {
+  DISH
+  SERVICE
+}
+
+Table User {
+  id varchar [pk]
+  email varchar [not null, unique]
+  passwordHash varchar [not null]
+  fullName varchar [not null]
+  phone varchar
+  role UserRole [not null, default: "CLIENT"]
+  isActive boolean [not null, default: true]
+  createdAt timestamp [not null, default: `now()`]
+  updatedAt timestamp [not null]
+}
+
+Table DiningTable {
+  id varchar [pk]
+  code varchar [not null, unique]
+  seats int [not null]
+  status TableStatus [not null, default: "AVAILABLE"]
+  assignedWaiterId varchar
+  createdAt timestamp [not null, default: `now()`]
+  updatedAt timestamp [not null]
+
+  indexes {
+    status
+    assignedWaiterId
+  }
+}
+
+Table Reservation {
+  id varchar [pk]
+  userId varchar
+  tableId varchar [not null]
+  guestCount int [not null]
+  startAt timestamp [not null]
+  endAt timestamp [not null]
+  status ReservationStatus [not null, default: "PENDING"]
+  notes text
+  cancelledAt timestamp
+  reminderSentAt timestamp
+  createdAt timestamp [not null, default: `now()`]
+  updatedAt timestamp [not null]
+
+  indexes {
+    (tableId, startAt, endAt)
+    userId
+    status
+  }
+}
+
+Table Category {
+  id varchar [pk]
+  name varchar [not null, unique]
+  createdAt timestamp [not null, default: `now()`]
+  updatedAt timestamp [not null]
+}
+
+Table MenuItem {
+  id varchar [pk]
+  name varchar [not null]
+  description text
+  imageUrl text
+  price decimal(10,2) [not null]
+  isAvailable boolean [not null, default: true]
+  vegetarian boolean [not null, default: false]
+  halal boolean [not null, default: false]
+  glutenFree boolean [not null, default: false]
+  categoryId varchar [not null]
+  createdAt timestamp [not null, default: `now()`]
+  updatedAt timestamp [not null]
+
+  indexes {
+    categoryId
+  }
+}
+
+Table ClientAddress {
+  id varchar [pk]
+  userId varchar [not null]
+  label varchar [not null]
+  addressLine text [not null]
+  city varchar [not null]
+  postalCode varchar
+  isDefault boolean [not null, default: false]
+  createdAt timestamp [not null, default: `now()`]
+  updatedAt timestamp [not null]
+
+  indexes {
+    userId
+  }
+}
+
+Table ClientPreference {
+  id varchar [pk]
+  userId varchar [not null, unique]
+  dietaryRestrictions text
+  allergens text
+  preferredDeliveryNotes text
+  marketingOptIn boolean [not null, default: false]
+  createdAt timestamp [not null, default: `now()`]
+  updatedAt timestamp [not null]
+}
+
+Table FavoriteMenuItem {
+  id varchar [pk]
+  userId varchar [not null]
+  menuItemId varchar [not null]
+  createdAt timestamp [not null, default: `now()`]
+
+  indexes {
+    (userId, menuItemId) [unique]
+    userId
+    menuItemId
+  }
+}
+
+Table FormulaBundle {
+  id varchar [pk]
+  name varchar [not null, unique]
+  description text
+  price decimal(10,2) [not null]
+  isAvailable boolean [not null, default: true]
+  createdAt timestamp [not null, default: `now()`]
+  updatedAt timestamp [not null]
+
+  indexes {
+    isAvailable
+  }
+}
+
+Table FormulaBundleItem {
+  id varchar [pk]
+  bundleId varchar [not null]
+  menuItemId varchar [not null]
+  quantity int [not null, default: 1]
+
+  indexes {
+    (bundleId, menuItemId) [unique]
+    bundleId
+    menuItemId
+  }
+}
+
+Table Supplier {
+  id varchar [pk]
+  name varchar [not null, unique]
+  email varchar
+  phone varchar
+  address text
+  isActive boolean [not null, default: true]
+  createdAt timestamp [not null, default: `now()`]
+  updatedAt timestamp [not null]
+}
+
+Table Ingredient {
+  id varchar [pk]
+  name varchar [not null, unique]
+  imageUrl text
+  unit varchar [not null]
+  minStockLevel decimal(10,2) [not null]
+  defaultSupplierId varchar
+  createdAt timestamp [not null, default: `now()`]
+  updatedAt timestamp [not null]
+}
+
+Table SupplierCatalogItem {
+  id varchar [pk]
+  supplierId varchar [not null]
+  ingredientId varchar [not null]
+  supplierSku varchar
+  unit varchar
+  leadTimeDays int
+  unitPrice decimal(10,2) [not null]
+  isActive boolean [not null, default: true]
+  createdAt timestamp [not null, default: `now()`]
+  updatedAt timestamp [not null]
+
+  indexes {
+    (supplierId, ingredientId) [unique]
+    supplierId
+    ingredientId
+    isActive
+  }
+}
+
+Table SupplierOrder {
+  id varchar [pk]
+  supplierId varchar [not null]
+  status SupplierOrderStatus [not null, default: "DRAFT"]
+  notes text
+  orderedAt timestamp [not null, default: `now()`]
+  receivedAt timestamp
+  totalAmount decimal(12,2) [not null, default: 0]
+  createdAt timestamp [not null, default: `now()`]
+  updatedAt timestamp [not null]
+
+  indexes {
+    supplierId
+    status
+  }
+}
+
+Table SupplierOrderItem {
+  id varchar [pk]
+  supplierOrderId varchar [not null]
+  ingredientId varchar [not null]
+  supplierCatalogItemId varchar
+  quantity decimal(10,2) [not null]
+  unitCost decimal(10,2) [not null]
+  lineTotal decimal(12,2) [not null]
+  createdAt timestamp [not null, default: `now()`]
+
+  indexes {
+    (supplierOrderId, ingredientId) [unique]
+    supplierOrderId
+    ingredientId
+    supplierCatalogItemId
+  }
+}
+
+Table Inventory {
+  id varchar [pk]
+  ingredientId varchar [not null, unique]
+  currentStock decimal(10,2) [not null]
+  updatedAt timestamp [not null]
+}
+
+Table MenuItemIngredient {
+  menuItemId varchar [not null, pk]
+  ingredientId varchar [not null, pk]
+  quantityNeeded decimal(10,2) [not null]
+}
+
+Table Order {
+  id varchar [pk]
+  orderNumber int [not null, unique, increment]
+  customerId varchar
+  employeeId varchar
+  status OrderStatus [not null, default: "PENDING"]
+  orderType OrderType [not null]
+  tableNumber int
+  tableId varchar
+  notes text
+  billNumber varchar [unique]
+  billedAt timestamp
+  subtotal decimal(10,2) [not null]
+  loyaltyDiscount decimal(10,2) [not null, default: 0]
+  loyaltyAutoApplied boolean [not null, default: false]
+  tax decimal(10,2) [not null]
+  total decimal(10,2) [not null]
+  createdAt timestamp [not null, default: `now()`]
+  updatedAt timestamp [not null]
+
+  indexes {
+    customerId
+    employeeId
+    tableId
+    status
+  }
+}
+
+Table Cart {
+  id varchar [pk]
+  userId varchar [not null]
+  isActive boolean [not null, default: true]
+  createdAt timestamp [not null, default: `now()`]
+  updatedAt timestamp [not null]
+
+  indexes {
+    userId
+  }
+}
+
+Table CartItem {
+  id varchar [pk]
+  cartId varchar [not null]
+  menuItemId varchar [not null]
+  quantity int [not null]
+  createdAt timestamp [not null, default: `now()`]
+  updatedAt timestamp [not null]
+
+  indexes {
+    (cartId, menuItemId) [unique]
+    cartId
+  }
+}
+
+Table OrderItem {
+  id varchar [pk]
+  orderId varchar [not null]
+  menuItemId varchar [not null]
+  quantity int [not null]
+  unitPrice decimal(10,2) [not null]
+  totalPrice decimal(10,2) [not null]
+
+  indexes {
+    orderId
+    menuItemId
+  }
+}
+
+Table Review {
+  id varchar [pk]
+  userId varchar [not null]
+  orderId varchar [not null]
+  orderItemId varchar
+  menuItemId varchar
+  type ReviewType [not null, default: "DISH"]
+  rating int [not null]
+  comment text
+  createdAt timestamp [not null, default: `now()`]
+  updatedAt timestamp [not null]
+
+  indexes {
+    (userId, orderItemId) [unique]
+    (menuItemId, createdAt)
+    (type, createdAt)
+    orderId
+    userId
+  }
+}
+
+Table LoyaltyAccount {
+  id varchar [pk]
+  userId varchar [not null, unique]
+  points int [not null, default: 0]
+  lifetimePoints int [not null, default: 0]
+  completedOrders int [not null, default: 0]
+  createdAt timestamp [not null, default: `now()`]
+  updatedAt timestamp [not null]
+
+  indexes {
+    points
+  }
+}
+
+Table LoyaltyTransaction {
+  id varchar [pk]
+  accountId varchar [not null]
+  userId varchar [not null]
+  orderId varchar
+  type LoyaltyTransactionType [not null]
+  pointsDelta int [not null]
+  balanceAfter int [not null]
+  reason text
+  referenceKey varchar [unique]
+  createdAt timestamp [not null, default: `now()`]
+
+  indexes {
+    (accountId, createdAt)
+    (userId, createdAt)
+    orderId
+  }
+}
+
+Table ReconciliationSession {
+  id varchar [pk]
+  periodStart timestamp [not null]
+  periodEnd timestamp [not null]
+  expectedTotal decimal(12,2) [not null]
+  bankTotal decimal(12,2) [not null]
+  discrepancy decimal(12,2) [not null]
+  reconciledPayments int [not null]
+  reconciledClosings int [not null]
+  createdAt timestamp [not null, default: `now()`]
+  updatedAt timestamp [not null]
+
+  indexes {
+    (periodStart, periodEnd)
+  }
+}
+
+Table Payment {
+  id varchar [pk]
+  orderId varchar [not null]
+  userId varchar
+  amount decimal(10,2) [not null]
+  method PaymentMethod [not null]
+  status PaymentStatus [not null, default: "PENDING"]
+  transactionRef varchar
+  isReconciled boolean [not null, default: false]
+  reconciledAt timestamp
+  reconciliationSessionId varchar
+  createdAt timestamp [not null, default: `now()`]
+  updatedAt timestamp [not null]
+
+  indexes {
+    orderId
+    createdAt
+    isReconciled
+    reconciliationSessionId
+  }
+}
+
+Table CashClosing {
+  id varchar [pk]
+  closedDate timestamp [not null, unique]
+  expectedCash decimal(10,2) [not null]
+  actualCash decimal(10,2) [not null]
+  discrepancy decimal(10,2) [not null]
+  totalRevenue decimal(10,2) [not null]
+  totalPayments int [not null]
+  isReconciled boolean [not null, default: false]
+  reconciledAt timestamp
+  reconciliationSessionId varchar
+  closedById varchar
+  notes text
+  createdAt timestamp [not null, default: `now()`]
+  updatedAt timestamp [not null]
+
+  indexes {
+    closedDate
+    isReconciled
+    reconciliationSessionId
+  }
+}
+
+Table Employee {
+  id varchar [pk]
+  userId varchar [unique]
+  fullName varchar [not null]
+  email varchar
+  phone varchar
+  position varchar [not null]
+  employmentStatus EmploymentStatus [not null, default: "ACTIVE"]
+  hireDate timestamp [not null]
+  baseSalary decimal(10,2) [not null]
+  contractType ContractType [not null]
+  createdAt timestamp [not null, default: `now()`]
+  updatedAt timestamp [not null]
+
+  indexes {
+    employmentStatus
+    position
+  }
+}
+
+Table Attendance {
+  id varchar [pk]
+  employeeId varchar [not null]
+  date timestamp [not null]
+  checkInAt timestamp
+  checkOutAt timestamp
+  status AttendanceStatus [not null, default: "PRESENT"]
+  notes text
+  createdAt timestamp [not null, default: `now()`]
+  updatedAt timestamp [not null]
+
+  indexes {
+    (employeeId, date) [unique]
+    date
+    status
+  }
+}
+
+Table Absence {
+  id varchar [pk]
+  employeeId varchar [not null]
+  date timestamp [not null]
+  reason text [not null]
+  status AbsenceStatus [not null, default: "PENDING"]
+  createdAt timestamp [not null, default: `now()`]
+  updatedAt timestamp [not null]
+
+  indexes {
+    (employeeId, date)
+    status
+  }
+}
+
+Table PayrollRecord {
+  id varchar [pk]
+  employeeId varchar [not null]
+  periodStart timestamp [not null]
+  periodEnd timestamp [not null]
+  grossSalary decimal(10,2) [not null]
+  cnssDeduction decimal(10,2) [not null]
+  taxDeduction decimal(10,2) [not null]
+  otherDeduction decimal(10,2) [not null, default: 0]
+  netSalary decimal(10,2) [not null]
+  notes text
+  createdAt timestamp [not null, default: `now()`]
+  updatedAt timestamp [not null]
+
+  indexes {
+    (employeeId, periodStart, periodEnd) [unique]
+    (periodStart, periodEnd)
+  }
+}
+
+Table BankMovement {
+  id varchar [pk]
+  movementDate timestamp [not null]
+  amount decimal(10,2) [not null]
+  type BankMovementType [not null]
+  reference varchar
+  notes text
+  isReconciled boolean [not null, default: false]
+  reconciledAt timestamp
+  sessionId varchar
+  createdAt timestamp [not null, default: `now()`]
+  updatedAt timestamp [not null]
+
+  indexes {
+    movementDate
+    type
+    isReconciled
+    sessionId
+  }
+}
+
+Table Expense {
+  id varchar [pk]
+  title varchar [not null]
+  category ExpenseCategory [not null]
+  amount decimal(10,2) [not null]
+  expenseDate timestamp [not null]
+  paidById varchar
+  notes text
+  createdAt timestamp [not null, default: `now()`]
+  updatedAt timestamp [not null]
+
+  indexes {
+    expenseDate
+    category
+    paidById
+  }
+}
+
+Table StockMovement {
+  id varchar [pk]
+  ingredientId varchar [not null]
+  type StockMovementType [not null]
+  quantity decimal(10,2) [not null]
+  reason text
+  createdAt timestamp [not null, default: `now()`]
+
+  indexes {
+    ingredientId
+    createdAt
+  }
+}
+
+Table DailyStat {
+  id varchar [pk]
+  date timestamp [not null, unique]
+  totalRevenue decimal(12,2) [not null, default: 0]
+  totalOrders int [not null, default: 0]
+  createdAt timestamp [not null, default: `now()`]
+  updatedAt timestamp [not null]
+}
+
+Ref: DiningTable.assignedWaiterId > User.id
+Ref: Reservation.userId > User.id
+Ref: Reservation.tableId > DiningTable.id
+Ref: MenuItem.categoryId > Category.id
+Ref: ClientAddress.userId > User.id
+Ref: ClientPreference.userId > User.id
+Ref: FavoriteMenuItem.userId > User.id
+Ref: FavoriteMenuItem.menuItemId > MenuItem.id
+Ref: FormulaBundleItem.bundleId > FormulaBundle.id
+Ref: FormulaBundleItem.menuItemId > MenuItem.id
+Ref: Ingredient.defaultSupplierId > Supplier.id
+Ref: SupplierCatalogItem.supplierId > Supplier.id
+Ref: SupplierCatalogItem.ingredientId > Ingredient.id
+Ref: SupplierOrder.supplierId > Supplier.id
+Ref: SupplierOrderItem.supplierOrderId > SupplierOrder.id
+Ref: SupplierOrderItem.ingredientId > Ingredient.id
+Ref: SupplierOrderItem.supplierCatalogItemId > SupplierCatalogItem.id
+Ref: Inventory.ingredientId > Ingredient.id
+Ref: MenuItemIngredient.menuItemId > MenuItem.id
+Ref: MenuItemIngredient.ingredientId > Ingredient.id
+Ref: Order.customerId > User.id
+Ref: Order.employeeId > User.id
+Ref: Order.tableId > DiningTable.id
+Ref: Cart.userId > User.id
+Ref: CartItem.cartId > Cart.id
+Ref: CartItem.menuItemId > MenuItem.id
+Ref: OrderItem.orderId > Order.id
+Ref: OrderItem.menuItemId > MenuItem.id
+Ref: Review.userId > User.id
+Ref: Review.orderId > Order.id
+Ref: Review.orderItemId > OrderItem.id
+Ref: Review.menuItemId > MenuItem.id
+Ref: LoyaltyAccount.userId > User.id
+Ref: LoyaltyTransaction.accountId > LoyaltyAccount.id
+Ref: LoyaltyTransaction.userId > User.id
+Ref: LoyaltyTransaction.orderId > Order.id
+Ref: Payment.orderId > Order.id
+Ref: Payment.userId > User.id
+Ref: Payment.reconciliationSessionId > ReconciliationSession.id
+Ref: CashClosing.closedById > User.id
+Ref: CashClosing.reconciliationSessionId > ReconciliationSession.id
+Ref: Employee.userId > User.id
+Ref: Attendance.employeeId > Employee.id
+Ref: Absence.employeeId > Employee.id
+Ref: PayrollRecord.employeeId > Employee.id
+Ref: BankMovement.sessionId > ReconciliationSession.id
+Ref: Expense.paidById > User.id
+Ref: StockMovement.ingredientId > Ingredient.id

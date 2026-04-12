@@ -13,11 +13,16 @@ import {
   OrderStatus,
   PaymentStatus,
   UserRole,
+  BankMovementType,
 } from '../common/constants/domain-enums';
+import { Prisma } from '@prisma/client';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { CloseDailyCashDto } from './dto/close-daily-cash.dto';
 import { CreateMixedPaymentDto } from './dto/create-mixed-payment.dto';
 import { PaymentCompletedEvent } from '../orders/events';
+import { ListPaymentsQueryDto } from './dto/list-payments-query.dto';
+import { CreateBankMovementDto } from './dto/create-bank-movement.dto';
+import { RunReconciliationDto } from './dto/run-reconciliation.dto';
 
 @Injectable()
 export class PaymentsService {
@@ -51,6 +56,51 @@ export class PaymentsService {
         .filter((payment) => payment.status === PaymentStatus.PAID)
         .reduce((acc, payment) => acc + Number(payment.amount), 0),
     );
+  }
+
+  private buildPaymentFilters(query: ListPaymentsQueryDto = {}): Prisma.PaymentWhereInput {
+    const fromDate = query.from ? new Date(query.from) : undefined;
+    const toDate = query.to ? new Date(query.to) : undefined;
+
+    if (
+      (fromDate && Number.isNaN(fromDate.getTime())) ||
+      (toDate && Number.isNaN(toDate.getTime())) ||
+      (fromDate && toDate && fromDate > toDate)
+    ) {
+      throw new BadRequestException('INVALID_INPUT');
+    }
+
+    if (
+      query.amountMin !== undefined &&
+      query.amountMax !== undefined &&
+      query.amountMin > query.amountMax
+    ) {
+      throw new BadRequestException('INVALID_INPUT');
+    }
+
+    return {
+      ...(query.method ? { method: query.method } : {}),
+      ...(query.status ? { status: query.status } : {}),
+      ...(query.orderId ? { orderId: query.orderId } : {}),
+      ...(query.userId ? { userId: query.userId } : {}),
+      ...(query.isReconciled !== undefined ? { isReconciled: query.isReconciled } : {}),
+      ...((fromDate || toDate)
+        ? {
+            createdAt: {
+              ...(fromDate ? { gte: fromDate } : {}),
+              ...(toDate ? { lte: toDate } : {}),
+            },
+          }
+        : {}),
+      ...((query.amountMin !== undefined || query.amountMax !== undefined)
+        ? {
+            amount: {
+              ...(query.amountMin !== undefined ? { gte: query.amountMin } : {}),
+              ...(query.amountMax !== undefined ? { lte: query.amountMax } : {}),
+            },
+          }
+        : {}),
+    };
   }
 
   private async getOrderOrThrow(orderId: string) {
@@ -245,16 +295,19 @@ export class PaymentsService {
     };
   }
 
-  getTransactions() {
+  getTransactions(query: ListPaymentsQueryDto = {}) {
     return this.prisma.payment.findMany({
+      where: this.buildPaymentFilters(query),
       include: { order: true, user: true },
       orderBy: { createdAt: 'desc' },
     });
   }
 
-  async getMyTransactions(userId: string) {
+  async getMyTransactions(userId: string, query: ListPaymentsQueryDto = {}) {
+    const where = this.buildPaymentFilters(query);
     return this.prisma.payment.findMany({
       where: {
+        ...where,
         order: {
           customerId: userId,
         },
@@ -424,9 +477,9 @@ export class PaymentsService {
     };
   }
 
-  async getTreasurySummary(from?: string, to?: string) {
-    const fromDate = from ? new Date(from) : new Date('1970-01-01T00:00:00.000Z');
-    const toDate = to ? new Date(to) : new Date();
+  async getTreasurySummary(from?: string, to?: string, filters: ListPaymentsQueryDto = {}) {
+    const fromDate = from ? new Date(from) : (filters.from ? new Date(filters.from) : new Date('1970-01-01T00:00:00.000Z'));
+    const toDate = to ? new Date(to) : (filters.to ? new Date(filters.to) : new Date());
 
     if (Number.isNaN(fromDate.getTime()) || Number.isNaN(toDate.getTime()) || fromDate > toDate) {
       throw new BadRequestException('INVALID_INPUT');
@@ -435,6 +488,11 @@ export class PaymentsService {
     const [payments, closings] = await Promise.all([
       this.prisma.payment.findMany({
         where: {
+          ...this.buildPaymentFilters({
+            ...filters,
+            from: undefined,
+            to: undefined,
+          }),
           status: PaymentStatus.PAID,
           createdAt: {
             gte: fromDate,
@@ -481,6 +539,211 @@ export class PaymentsService {
         ),
       },
       closings,
+    };
+  }
+
+  async createBankMovement(dto: CreateBankMovementDto) {
+    const movementDate = new Date(dto.movementDate);
+    if (Number.isNaN(movementDate.getTime())) {
+      throw new BadRequestException('INVALID_INPUT');
+    }
+
+    return this.prisma.bankMovement.create({
+      data: {
+        movementDate,
+        amount: dto.amount,
+        type: dto.type,
+        reference: dto.reference,
+        notes: dto.notes,
+      },
+    });
+  }
+
+  async runReconciliation(dto: RunReconciliationDto) {
+    const from = new Date(dto.from);
+    const to = new Date(dto.to);
+
+    if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime()) || from > to) {
+      throw new BadRequestException('INVALID_INPUT');
+    }
+
+    const [payments, closings, bankMovements] = await Promise.all([
+      this.prisma.payment.findMany({
+        where: {
+          status: PaymentStatus.PAID,
+          createdAt: {
+            gte: from,
+            lte: to,
+          },
+        },
+      }),
+      this.prisma.cashClosing.findMany({
+        where: {
+          closedDate: {
+            gte: from,
+            lte: to,
+          },
+        },
+      }),
+      this.prisma.bankMovement.findMany({
+        where: {
+          movementDate: {
+            gte: from,
+            lte: to,
+          },
+        },
+      }),
+    ]);
+
+    const expectedTotal = this.roundMoney(
+      payments.reduce((acc, payment) => acc + Number(payment.amount), 0),
+    );
+
+    const bankTotal = this.roundMoney(
+      bankMovements.reduce((acc, movement) => {
+        const signed =
+          movement.type === BankMovementType.CREDIT
+            ? Number(movement.amount)
+            : -Number(movement.amount);
+        return acc + signed;
+      }, 0),
+    );
+
+    const discrepancy = this.roundMoney(expectedTotal - bankTotal);
+
+    const session = await this.prisma.reconciliationSession.create({
+      data: {
+        periodStart: from,
+        periodEnd: to,
+        expectedTotal,
+        bankTotal,
+        discrepancy,
+        reconciledPayments: payments.length,
+        reconciledClosings: closings.length,
+      },
+    });
+
+    await this.prisma.$transaction([
+      this.prisma.payment.updateMany({
+        where: {
+          id: {
+            in: payments.map((payment) => payment.id),
+          },
+        },
+        data: {
+          isReconciled: true,
+          reconciledAt: new Date(),
+          reconciliationSessionId: session.id,
+        },
+      }),
+      this.prisma.cashClosing.updateMany({
+        where: {
+          id: {
+            in: closings.map((closing) => closing.id),
+          },
+        },
+        data: {
+          isReconciled: true,
+          reconciledAt: new Date(),
+          reconciliationSessionId: session.id,
+        },
+      }),
+      this.prisma.bankMovement.updateMany({
+        where: {
+          id: {
+            in: bankMovements.map((movement) => movement.id),
+          },
+        },
+        data: {
+          isReconciled: true,
+          reconciledAt: new Date(),
+          sessionId: session.id,
+        },
+      }),
+    ]);
+
+    return {
+      sessionId: session.id,
+      period: {
+        from: from.toISOString(),
+        to: to.toISOString(),
+      },
+      expectedTotal,
+      bankTotal,
+      discrepancy,
+      counts: {
+        payments: payments.length,
+        closings: closings.length,
+        bankMovements: bankMovements.length,
+      },
+    };
+  }
+
+  async getReconciliationSummary(from?: string, to?: string) {
+    const fromDate = from ? new Date(from) : new Date('1970-01-01T00:00:00.000Z');
+    const toDate = to ? new Date(to) : new Date();
+
+    if (Number.isNaN(fromDate.getTime()) || Number.isNaN(toDate.getTime()) || fromDate > toDate) {
+      throw new BadRequestException('INVALID_INPUT');
+    }
+
+    const [unreconciledPayments, unreconciledClosings, unreconciledBankMovements, sessions] =
+      await Promise.all([
+        this.prisma.payment.count({
+          where: {
+            status: PaymentStatus.PAID,
+            isReconciled: false,
+            createdAt: {
+              gte: fromDate,
+              lte: toDate,
+            },
+          },
+        }),
+        this.prisma.cashClosing.count({
+          where: {
+            isReconciled: false,
+            closedDate: {
+              gte: fromDate,
+              lte: toDate,
+            },
+          },
+        }),
+        this.prisma.bankMovement.count({
+          where: {
+            isReconciled: false,
+            movementDate: {
+              gte: fromDate,
+              lte: toDate,
+            },
+          },
+        }),
+        this.prisma.reconciliationSession.findMany({
+          where: {
+            periodStart: {
+              gte: fromDate,
+            },
+            periodEnd: {
+              lte: toDate,
+            },
+          },
+          orderBy: {
+            createdAt: 'desc',
+          },
+          take: 10,
+        }),
+      ]);
+
+    return {
+      period: {
+        from: fromDate.toISOString(),
+        to: toDate.toISOString(),
+      },
+      unreconciled: {
+        payments: unreconciledPayments,
+        closings: unreconciledClosings,
+        bankMovements: unreconciledBankMovements,
+      },
+      recentSessions: sessions,
     };
   }
 }

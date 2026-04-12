@@ -1,0 +1,974 @@
+{
+  "startedAt": "2026-04-10T20:14:28.996Z",
+  "sections": {
+    "auth": {
+      "pass": true,
+      "details": {
+        "checks": [
+          {
+            "name": "register success",
+            "pass": true,
+            "status": 201
+          },
+          {
+            "name": "login success",
+            "pass": true,
+            "status": 200
+          },
+          {
+            "name": "invalid credentials",
+            "pass": true,
+            "status": 401
+          },
+          {
+            "name": "invalid JWT rejected",
+            "pass": true,
+            "status": 401
+          },
+          {
+            "name": "RBAC forbidden works",
+            "pass": true,
+            "status": 403
+          },
+          {
+            "name": "Unauthenticated blocked",
+            "pass": true,
+            "status": 401
+          }
+        ]
+      }
+    },
+    "endpoints": {
+      "pass": true,
+      "details": {
+        "totalChecks": 81,
+        "passed": 81,
+        "failed": []
+      }
+    },
+    "database": {
+      "pass": true,
+      "details": {
+        "negativeStockCount": 0,
+        "orphanPaymentsCount": 0,
+        "orderTotalMismatchCount": 0,
+        "loyaltyBalanceMismatchCount": 0,
+        "reservationConflictPrevented": true
+      }
+    },
+    "events": {
+      "pass": true,
+      "details": {
+        "paymentStatus": 201,
+        "stockUpdated": true,
+        "dailyStatUpdated": true,
+        "loyaltyUpdated": true,
+        "reservationCreated": true,
+        "lowStockEndpointOperational": true,
+        "lowStockNotificationPersistence": "No notification persistence table; listener behavior is log-based"
+      }
+    },
+    "flows": {
+      "pass": true,
+      "details": {
+        "register": true,
+        "login": true,
+        "menu": true,
+        "addToCart": true,
+        "order": true,
+        "payment": true,
+        "history": true
+      }
+    },
+    "swagger": {
+      "pass": true,
+      "details": {
+        "docsJsonLoad": true,
+        "authDocumented": true,
+        "successEnvelopeDocumented": true,
+        "errorEnvelopeDocumented": true,
+        "paginationDocumented": true,
+        "requestExampleExists": true,
+        "expectedPathsPresent": true
+      }
+    },
+    "performance": {
+      "pass": true,
+      "details": {
+        "concurrentMenuRequests": 30,
+        "concurrentMenuFailures": 0,
+        "concurrentP95Ms": 1344,
+        "paginationLimitHandled": true,
+        "largePayloadHandled": true
+      }
+    },
+    "errorHandling": {
+      "pass": true,
+      "details": {
+        "notFoundCode": "NOT_FOUND",
+        "forbiddenCode": "FORBIDDEN_ROLE",
+        "validationCode": "VALIDATION_ERROR",
+        "conflictCode": "CONFLICT",
+        "errorEnvelopeConsistent": true,
+        "noRawStackLeak": true
+      }
+    }
+  },
+  "endpointInventory": [
+    {
+      "module": "auth",
+      "method": "POST",
+      "url": "/auth/register",
+      "auth": "Public",
+      "role": "-",
+      "description": "Register user"
+    },
+    {
+      "module": "auth",
+      "method": "POST",
+      "url": "/auth/login",
+      "auth": "Public",
+      "role": "-",
+      "description": "Login user"
+    },
+    {
+      "module": "users",
+      "method": "GET",
+      "url": "/clients/me/addresses",
+      "auth": "Bearer",
+      "role": "CLIENT",
+      "description": "List addresses"
+    },
+    {
+      "module": "users",
+      "method": "POST",
+      "url": "/clients/me/addresses",
+      "auth": "Bearer",
+      "role": "CLIENT",
+      "description": "Create address"
+    },
+    {
+      "module": "users",
+      "method": "PATCH",
+      "url": "/clients/me/addresses/:addressId/default",
+      "auth": "Bearer",
+      "role": "CLIENT",
+      "description": "Set default address"
+    },
+    {
+      "module": "users",
+      "method": "DELETE",
+      "url": "/clients/me/addresses/:addressId",
+      "auth": "Bearer",
+      "role": "CLIENT",
+      "description": "Delete address"
+    },
+    {
+      "module": "users",
+      "method": "GET",
+      "url": "/clients/me/preferences",
+      "auth": "Bearer",
+      "role": "CLIENT",
+      "description": "Get preferences"
+    },
+    {
+      "module": "users",
+      "method": "PATCH",
+      "url": "/clients/me/preferences",
+      "auth": "Bearer",
+      "role": "CLIENT",
+      "description": "Update preferences"
+    },
+    {
+      "module": "users",
+      "method": "GET",
+      "url": "/clients/me/favorites",
+      "auth": "Bearer",
+      "role": "CLIENT",
+      "description": "List favorites"
+    },
+    {
+      "module": "users",
+      "method": "POST",
+      "url": "/clients/me/favorites",
+      "auth": "Bearer",
+      "role": "CLIENT",
+      "description": "Add favorite"
+    },
+    {
+      "module": "users",
+      "method": "DELETE",
+      "url": "/clients/me/favorites/:menuItemId",
+      "auth": "Bearer",
+      "role": "CLIENT",
+      "description": "Remove favorite"
+    },
+    {
+      "module": "users",
+      "method": "GET",
+      "url": "/clients/me/invoices",
+      "auth": "Bearer",
+      "role": "CLIENT",
+      "description": "List invoices"
+    },
+    {
+      "module": "users",
+      "method": "GET",
+      "url": "/clients/me/summary",
+      "auth": "Bearer",
+      "role": "CLIENT",
+      "description": "Profile summary"
+    },
+    {
+      "module": "menu",
+      "method": "GET",
+      "url": "/menu",
+      "auth": "Public",
+      "role": "-",
+      "description": "Browse menu"
+    },
+    {
+      "module": "menu",
+      "method": "GET",
+      "url": "/menu/items",
+      "auth": "Public",
+      "role": "-",
+      "description": "Browse menu alias"
+    },
+    {
+      "module": "menu",
+      "method": "GET",
+      "url": "/menu/categories",
+      "auth": "Public",
+      "role": "-",
+      "description": "Browse menu categories"
+    },
+    {
+      "module": "menu",
+      "method": "GET",
+      "url": "/menu/items/:id/recipe",
+      "auth": "Public",
+      "role": "-",
+      "description": "Get recipe"
+    },
+    {
+      "module": "menu",
+      "method": "GET",
+      "url": "/menu/formulas",
+      "auth": "Public",
+      "role": "-",
+      "description": "List formula bundles"
+    },
+    {
+      "module": "menu",
+      "method": "GET",
+      "url": "/menu/:id",
+      "auth": "Public",
+      "role": "-",
+      "description": "Get menu item by id"
+    },
+    {
+      "module": "menu",
+      "method": "POST",
+      "url": "/menu/categories",
+      "auth": "Bearer",
+      "role": "ADMIN|MANAGER",
+      "description": "Create category"
+    },
+    {
+      "module": "menu",
+      "method": "POST",
+      "url": "/menu/items",
+      "auth": "Bearer",
+      "role": "ADMIN|MANAGER",
+      "description": "Create menu item"
+    },
+    {
+      "module": "menu",
+      "method": "POST",
+      "url": "/menu/items/:id/recipe",
+      "auth": "Bearer",
+      "role": "ADMIN|MANAGER",
+      "description": "Set recipe"
+    },
+    {
+      "module": "menu",
+      "method": "POST",
+      "url": "/menu/formulas",
+      "auth": "Bearer",
+      "role": "ADMIN|MANAGER",
+      "description": "Create formula bundle"
+    },
+    {
+      "module": "menu",
+      "method": "GET",
+      "url": "/menu/items/:id/margin",
+      "auth": "Bearer",
+      "role": "ADMIN|MANAGER",
+      "description": "Get margin"
+    },
+    {
+      "module": "menu",
+      "method": "POST",
+      "url": "/menu/:id/image",
+      "auth": "Bearer",
+      "role": "ADMIN",
+      "description": "Upload menu image"
+    },
+    {
+      "module": "menu",
+      "method": "DELETE",
+      "url": "/menu/items/:id",
+      "auth": "Bearer",
+      "role": "ADMIN|MANAGER",
+      "description": "Delete menu item"
+    },
+    {
+      "module": "categories",
+      "method": "GET",
+      "url": "/categories",
+      "auth": "Public",
+      "role": "-",
+      "description": "Browse categories"
+    },
+    {
+      "module": "inventory",
+      "method": "GET",
+      "url": "/inventory",
+      "auth": "Bearer",
+      "role": "ADMIN|MANAGER|EMPLOYEE",
+      "description": "List inventory"
+    },
+    {
+      "module": "inventory",
+      "method": "GET",
+      "url": "/inventory/alerts/low-stock",
+      "auth": "Bearer",
+      "role": "ADMIN|MANAGER|EMPLOYEE",
+      "description": "Low stock alerts"
+    },
+    {
+      "module": "inventory",
+      "method": "GET",
+      "url": "/inventory/movements/history",
+      "auth": "Bearer",
+      "role": "ADMIN|MANAGER|EMPLOYEE",
+      "description": "Movement history"
+    },
+    {
+      "module": "inventory",
+      "method": "POST",
+      "url": "/inventory/ingredients",
+      "auth": "Bearer",
+      "role": "ADMIN|MANAGER|EMPLOYEE",
+      "description": "Create ingredient"
+    },
+    {
+      "module": "inventory",
+      "method": "POST",
+      "url": "/inventory/movements",
+      "auth": "Bearer",
+      "role": "ADMIN|MANAGER|EMPLOYEE",
+      "description": "Create stock movement"
+    },
+    {
+      "module": "inventory",
+      "method": "DELETE",
+      "url": "/inventory/ingredients/:ingredientId",
+      "auth": "Bearer",
+      "role": "ADMIN|MANAGER",
+      "description": "Delete ingredient"
+    },
+    {
+      "module": "inventory",
+      "method": "GET",
+      "url": "/ingredients",
+      "auth": "Bearer",
+      "role": "ADMIN|MANAGER|EMPLOYEE",
+      "description": "List ingredients"
+    },
+    {
+      "module": "inventory",
+      "method": "POST",
+      "url": "/ingredients/:id/image",
+      "auth": "Bearer",
+      "role": "ADMIN",
+      "description": "Upload ingredient image"
+    },
+    {
+      "module": "orders",
+      "method": "GET",
+      "url": "/orders/cart",
+      "auth": "Bearer",
+      "role": "Any authenticated",
+      "description": "Get active cart"
+    },
+    {
+      "module": "orders",
+      "method": "POST",
+      "url": "/orders/cart/items",
+      "auth": "Bearer",
+      "role": "Any authenticated",
+      "description": "Add cart item"
+    },
+    {
+      "module": "orders",
+      "method": "POST",
+      "url": "/orders/cart/clear",
+      "auth": "Bearer",
+      "role": "Any authenticated",
+      "description": "Clear cart"
+    },
+    {
+      "module": "orders",
+      "method": "POST",
+      "url": "/orders",
+      "auth": "Bearer",
+      "role": "Any authenticated",
+      "description": "Place order"
+    },
+    {
+      "module": "orders",
+      "method": "GET",
+      "url": "/orders/history",
+      "auth": "Bearer",
+      "role": "Any authenticated",
+      "description": "Order history"
+    },
+    {
+      "module": "orders",
+      "method": "GET",
+      "url": "/orders/:orderId",
+      "auth": "Bearer",
+      "role": "Owner/backoffice",
+      "description": "Get order details"
+    },
+    {
+      "module": "orders",
+      "method": "GET",
+      "url": "/orders/:orderId/tracking",
+      "auth": "Bearer",
+      "role": "Owner/backoffice",
+      "description": "Track order"
+    },
+    {
+      "module": "orders",
+      "method": "PATCH",
+      "url": "/orders/:orderId/status",
+      "auth": "Bearer",
+      "role": "ADMIN|MANAGER|EMPLOYEE",
+      "description": "Update status"
+    },
+    {
+      "module": "orders",
+      "method": "PATCH",
+      "url": "/orders/:orderId/items/:orderItemId",
+      "auth": "Bearer",
+      "role": "ADMIN|MANAGER|EMPLOYEE",
+      "description": "Update order item"
+    },
+    {
+      "module": "orders",
+      "method": "DELETE",
+      "url": "/orders/:orderId/items/:orderItemId",
+      "auth": "Bearer",
+      "role": "ADMIN|MANAGER|EMPLOYEE",
+      "description": "Remove order item"
+    },
+    {
+      "module": "payments",
+      "method": "POST",
+      "url": "/payments",
+      "auth": "Bearer",
+      "role": "ADMIN|MANAGER|EMPLOYEE",
+      "description": "Create payment"
+    },
+    {
+      "module": "payments",
+      "method": "POST",
+      "url": "/payments/mixed",
+      "auth": "Bearer",
+      "role": "ADMIN|MANAGER|EMPLOYEE",
+      "description": "Create mixed payment"
+    },
+    {
+      "module": "payments",
+      "method": "GET",
+      "url": "/payments",
+      "auth": "Bearer",
+      "role": "ADMIN|MANAGER",
+      "description": "Transactions"
+    },
+    {
+      "module": "payments",
+      "method": "GET",
+      "url": "/payments/me",
+      "auth": "Bearer",
+      "role": "CLIENT",
+      "description": "My payments"
+    },
+    {
+      "module": "payments",
+      "method": "GET",
+      "url": "/payments/order/:orderId",
+      "auth": "Bearer",
+      "role": "Owner/backoffice",
+      "description": "Order payments"
+    },
+    {
+      "module": "payments",
+      "method": "GET",
+      "url": "/payments/closing/daily",
+      "auth": "Bearer",
+      "role": "ADMIN|MANAGER",
+      "description": "Daily closing report"
+    },
+    {
+      "module": "payments",
+      "method": "POST",
+      "url": "/payments/closing/daily",
+      "auth": "Bearer",
+      "role": "ADMIN|MANAGER",
+      "description": "Close daily cash"
+    },
+    {
+      "module": "payments",
+      "method": "GET",
+      "url": "/payments/treasury/summary",
+      "auth": "Bearer",
+      "role": "ADMIN|MANAGER",
+      "description": "Treasury summary"
+    },
+    {
+      "module": "reservations",
+      "method": "POST",
+      "url": "/reservations",
+      "auth": "Bearer",
+      "role": "Any authenticated",
+      "description": "Create reservation"
+    },
+    {
+      "module": "reservations",
+      "method": "GET",
+      "url": "/reservations/me",
+      "auth": "Bearer",
+      "role": "CLIENT",
+      "description": "My reservations"
+    },
+    {
+      "module": "reservations",
+      "method": "GET",
+      "url": "/reservations/availability",
+      "auth": "Bearer",
+      "role": "Any authenticated",
+      "description": "Availability"
+    },
+    {
+      "module": "reservations",
+      "method": "GET",
+      "url": "/reservations",
+      "auth": "Bearer",
+      "role": "ADMIN|MANAGER|EMPLOYEE",
+      "description": "List reservations"
+    },
+    {
+      "module": "reservations",
+      "method": "PATCH",
+      "url": "/reservations/:reservationId",
+      "auth": "Bearer",
+      "role": "Owner/backoffice",
+      "description": "Update reservation"
+    },
+    {
+      "module": "reservations",
+      "method": "PATCH",
+      "url": "/reservations/:reservationId/cancel",
+      "auth": "Bearer",
+      "role": "Owner/backoffice",
+      "description": "Cancel reservation"
+    },
+    {
+      "module": "reservations",
+      "method": "PATCH",
+      "url": "/reservations/:reservationId/status",
+      "auth": "Bearer",
+      "role": "ADMIN|MANAGER|EMPLOYEE",
+      "description": "Update reservation status"
+    },
+    {
+      "module": "loyalty",
+      "method": "GET",
+      "url": "/loyalty/me",
+      "auth": "Bearer",
+      "role": "CLIENT",
+      "description": "Get loyalty"
+    },
+    {
+      "module": "loyalty",
+      "method": "POST",
+      "url": "/loyalty/me/redeem",
+      "auth": "Bearer",
+      "role": "CLIENT",
+      "description": "Redeem rewards"
+    },
+    {
+      "module": "loyalty",
+      "method": "POST",
+      "url": "/loyalty/adjust",
+      "auth": "Bearer",
+      "role": "ADMIN|MANAGER",
+      "description": "Adjust points"
+    },
+    {
+      "module": "dashboard",
+      "method": "GET",
+      "url": "/dashboard/overview",
+      "auth": "Bearer",
+      "role": "ADMIN|MANAGER",
+      "description": "Overview"
+    },
+    {
+      "module": "dashboard",
+      "method": "GET",
+      "url": "/dashboard/report",
+      "auth": "Bearer",
+      "role": "ADMIN|MANAGER",
+      "description": "Report"
+    }
+  ],
+  "endpointTests": [
+    {
+      "name": "GET /health success",
+      "pass": true
+    },
+    {
+      "name": "GET /categories success",
+      "pass": true
+    },
+    {
+      "name": "GET /menu success",
+      "pass": true
+    },
+    {
+      "name": "GET /menu/items success",
+      "pass": true
+    },
+    {
+      "name": "GET /menu/formulas success",
+      "pass": true
+    },
+    {
+      "name": "GET /menu/:id success",
+      "pass": true
+    },
+    {
+      "name": "GET /menu/items/:id/recipe success",
+      "pass": true
+    },
+    {
+      "name": "GET /menu/:id not found",
+      "pass": true
+    },
+    {
+      "name": "GET /orders/cart unauthorized",
+      "pass": true
+    },
+    {
+      "name": "GET /dashboard/overview forbidden for client",
+      "pass": true
+    },
+    {
+      "name": "GET /payments forbidden for client",
+      "pass": true
+    },
+    {
+      "name": "GET /clients/me/summary forbidden for manager",
+      "pass": true
+    },
+    {
+      "name": "POST /clients/me/addresses success",
+      "pass": true
+    },
+    {
+      "name": "POST /clients/me/addresses invalid dto",
+      "pass": true
+    },
+    {
+      "name": "PATCH /clients/me/addresses/:id/default success",
+      "pass": true
+    },
+    {
+      "name": "DELETE /clients/me/addresses/:id success",
+      "pass": true
+    },
+    {
+      "name": "DELETE /clients/me/addresses/:id not found",
+      "pass": true
+    },
+    {
+      "name": "GET /clients/me/preferences success",
+      "pass": true
+    },
+    {
+      "name": "PATCH /clients/me/preferences success",
+      "pass": true
+    },
+    {
+      "name": "GET /clients/me/favorites success",
+      "pass": true
+    },
+    {
+      "name": "GET /clients/me/invoices success",
+      "pass": true
+    },
+    {
+      "name": "GET /clients/me/summary success",
+      "pass": true
+    },
+    {
+      "name": "POST /clients/me/favorites success",
+      "pass": true
+    },
+    {
+      "name": "DELETE /clients/me/favorites/:id success",
+      "pass": true
+    },
+    {
+      "name": "POST /menu/categories success",
+      "pass": true
+    },
+    {
+      "name": "POST /menu/categories forbidden for client",
+      "pass": true
+    },
+    {
+      "name": "POST /menu/items success",
+      "pass": true
+    },
+    {
+      "name": "POST /menu/items invalid dto",
+      "pass": true
+    },
+    {
+      "name": "POST /menu/items/:id/recipe success",
+      "pass": true
+    },
+    {
+      "name": "GET /menu/items/:id/margin success",
+      "pass": true
+    },
+    {
+      "name": "DELETE /menu/items/:id success",
+      "pass": true
+    },
+    {
+      "name": "GET /inventory success",
+      "pass": true
+    },
+    {
+      "name": "GET /inventory unauthorized",
+      "pass": true
+    },
+    {
+      "name": "GET /inventory/alerts/low-stock success",
+      "pass": true
+    },
+    {
+      "name": "GET /inventory/movements/history success",
+      "pass": true
+    },
+    {
+      "name": "POST /inventory/ingredients success",
+      "pass": true
+    },
+    {
+      "name": "POST /inventory/ingredients invalid dto",
+      "pass": true
+    },
+    {
+      "name": "POST /inventory/movements success",
+      "pass": true
+    },
+    {
+      "name": "POST /inventory/movements invalid dto",
+      "pass": true
+    },
+    {
+      "name": "DELETE /inventory/ingredients/:id success",
+      "pass": true
+    },
+    {
+      "name": "DELETE /inventory/ingredients/:id forbidden for employee",
+      "pass": true
+    },
+    {
+      "name": "GET /ingredients success",
+      "pass": true
+    },
+    {
+      "name": "POST /orders/cart/clear success",
+      "pass": true
+    },
+    {
+      "name": "GET /orders/cart success",
+      "pass": true
+    },
+    {
+      "name": "POST /orders/cart/items success",
+      "pass": true
+    },
+    {
+      "name": "POST /orders/cart/items invalid dto",
+      "pass": true
+    },
+    {
+      "name": "POST /orders success",
+      "pass": true
+    },
+    {
+      "name": "POST /orders business violation dine_in without table",
+      "pass": true
+    },
+    {
+      "name": "GET /orders/:id success",
+      "pass": true
+    },
+    {
+      "name": "GET /orders/:id/tracking success",
+      "pass": true
+    },
+    {
+      "name": "GET /orders/history success",
+      "pass": true
+    },
+    {
+      "name": "GET /orders/:id not found",
+      "pass": true
+    },
+    {
+      "name": "PATCH /orders/:id/status forbidden client",
+      "pass": true
+    },
+    {
+      "name": "PATCH /orders/:id/items/:orderItemId success",
+      "pass": true
+    },
+    {
+      "name": "DELETE /orders/:id/items/:orderItemId success",
+      "pass": true
+    },
+    {
+      "name": "POST /payments success",
+      "pass": true
+    },
+    {
+      "name": "POST /payments business violation overpay",
+      "pass": true
+    },
+    {
+      "name": "GET /payments/order/:orderId success",
+      "pass": true
+    },
+    {
+      "name": "GET /payments success",
+      "pass": true
+    },
+    {
+      "name": "GET /payments/me success",
+      "pass": true
+    },
+    {
+      "name": "GET /payments/closing/daily success",
+      "pass": true
+    },
+    {
+      "name": "GET /payments/treasury/summary success",
+      "pass": true
+    },
+    {
+      "name": "POST /payments/closing/daily invalid dto",
+      "pass": true
+    },
+    {
+      "name": "POST /reservations success",
+      "pass": true
+    },
+    {
+      "name": "POST /reservations invalid dto",
+      "pass": true
+    },
+    {
+      "name": "GET /reservations/me success",
+      "pass": true
+    },
+    {
+      "name": "GET /reservations success",
+      "pass": true
+    },
+    {
+      "name": "GET /reservations forbidden for client",
+      "pass": true
+    },
+    {
+      "name": "GET /reservations/availability success",
+      "pass": true
+    },
+    {
+      "name": "PATCH /reservations/:id success",
+      "pass": true
+    },
+    {
+      "name": "PATCH /reservations/:id/status success",
+      "pass": true
+    },
+    {
+      "name": "PATCH /reservations/:id/cancel success",
+      "pass": true
+    },
+    {
+      "name": "PATCH /reservations/:id/status forbidden client",
+      "pass": true
+    },
+    {
+      "name": "GET /loyalty/me success",
+      "pass": true
+    },
+    {
+      "name": "POST /loyalty/me/redeem business violation",
+      "pass": true
+    },
+    {
+      "name": "POST /loyalty/adjust success",
+      "pass": true
+    },
+    {
+      "name": "POST /loyalty/adjust forbidden client",
+      "pass": true
+    },
+    {
+      "name": "GET /dashboard/overview success",
+      "pass": true
+    },
+    {
+      "name": "GET /dashboard/report success",
+      "pass": true
+    },
+    {
+      "name": "Response contract has success boolean",
+      "pass": true
+    },
+    {
+      "name": "Response contract has data for success",
+      "pass": true
+    }
+  ],
+  "criticalIssues": [],
+  "improvements": [],
+  "recommendations": [
+    "Keep Prisma client and schema tooling upgraded; package.json prisma config is deprecated for Prisma 7.",
+    "Add a dedicated automated token-expiration test using short-lived JWT in CI.",
+    "Add contract tests that diff runtime responses vs /docs-json schemas on CI."
+  ],
+  "readyForFrontendIntegration": true,
+  "finishedAt": "2026-04-10T20:16:08.012Z"
+}

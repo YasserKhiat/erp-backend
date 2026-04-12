@@ -6,14 +6,19 @@ import {
   Param,
   Post,
   Query,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
+  ApiBody,
+  ApiConsumes,
   ApiOperation,
   ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { paginateArray } from '../common/utils/pagination';
 import { Roles } from '../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -28,6 +33,7 @@ import { CreateFormulaBundleDto } from './dto/create-formula-bundle.dto';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { CreateMenuItemDto } from './dto/create-menu-item.dto';
 import { SetMenuItemRecipeDto } from './dto/set-menu-item-recipe.dto';
+import { imageUploadMulterOptions } from '../common/utils/image-upload.config';
 import { MenuService } from './menu.service';
 
 @ApiTags('menu')
@@ -42,6 +48,9 @@ export class MenuController {
     description: 'Primary frontend menu endpoint with optional filters.',
   })
   @ApiQuery({ name: 'availableOnly', required: false, type: Boolean })
+  @ApiQuery({ name: 'vegetarian', required: false, type: Boolean })
+  @ApiQuery({ name: 'halal', required: false, type: Boolean })
+  @ApiQuery({ name: 'glutenFree', required: false, type: Boolean })
   @ApiQuery({ name: 'categoryId', required: false, type: String })
   @ApiQuery({ name: 'search', required: false, type: String })
   @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
@@ -49,6 +58,9 @@ export class MenuController {
   @ApiContractListOk({ description: 'Paginated menu items list.' })
   getMenu(
     @Query('availableOnly') availableOnly?: string,
+    @Query('vegetarian') vegetarian?: string,
+    @Query('halal') halal?: string,
+    @Query('glutenFree') glutenFree?: string,
     @Query('categoryId') categoryId?: string,
     @Query('search') search?: string,
     @Query('page') page?: string,
@@ -57,6 +69,9 @@ export class MenuController {
     return this.menuService
       .getMenu({
         availableOnly: availableOnly === 'true',
+        vegetarian: vegetarian === 'true',
+        halal: halal === 'true',
+        glutenFree: glutenFree === 'true',
         categoryId,
         search,
       })
@@ -84,6 +99,9 @@ export class MenuController {
   @Get('items')
   @ApiOperation({ summary: 'Browse menu items (legacy alias)' })
   @ApiQuery({ name: 'availableOnly', required: false, type: Boolean })
+  @ApiQuery({ name: 'vegetarian', required: false, type: Boolean })
+  @ApiQuery({ name: 'halal', required: false, type: Boolean })
+  @ApiQuery({ name: 'glutenFree', required: false, type: Boolean })
   @ApiQuery({ name: 'categoryId', required: false, type: String })
   @ApiQuery({ name: 'search', required: false, type: String })
   @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
@@ -91,6 +109,9 @@ export class MenuController {
   @ApiContractListOk({ description: 'Paginated legacy menu items list.' })
   getItems(
     @Query('availableOnly') availableOnly?: string,
+    @Query('vegetarian') vegetarian?: string,
+    @Query('halal') halal?: string,
+    @Query('glutenFree') glutenFree?: string,
     @Query('categoryId') categoryId?: string,
     @Query('search') search?: string,
     @Query('page') page?: string,
@@ -99,6 +120,9 @@ export class MenuController {
     return this.menuService
       .getMenu({
         availableOnly: availableOnly === 'true',
+        vegetarian: vegetarian === 'true',
+        halal: halal === 'true',
+        glutenFree: glutenFree === 'true',
         categoryId,
         search,
       })
@@ -186,6 +210,52 @@ export class MenuController {
   @ApiContractOk({ description: 'Menu item margin details.', dataSchema: { type: 'object' } })
   getMenuItemMargin(@Param('id') id: string) {
     return this.menuService.getMenuItemMargin(id);
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Get menu item details by id' })
+  @ApiContractOk({ description: 'Menu item details.', dataSchema: { type: 'object' } })
+  getMenuItemById(@Param('id') id: string) {
+    return this.menuService.getMenuItemById(id);
+  }
+
+  @Post(':id/image')
+  @ApiOperation({ summary: 'Upload menu item image (Cloudinary)' })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @UseInterceptors(FileInterceptor('file', imageUploadMulterOptions))
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['file'],
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+        },
+      },
+    },
+  })
+  @ApiContractOk({
+    description: 'Menu item image uploaded.',
+    dataSchema: {
+      type: 'object',
+      properties: {
+        imageUrl: {
+          type: 'string',
+          format: 'uri',
+        },
+      },
+      required: ['imageUrl'],
+    },
+  })
+  uploadMenuItemImage(
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    return this.menuService.uploadMenuItemImage(id, file);
   }
 
   @Delete('items/:id')

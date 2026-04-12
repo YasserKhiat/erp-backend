@@ -99,8 +99,60 @@ Required values in .env:
 - JWT_EXPIRES_IN: token validity window (example: 1d)
 - PORT: API port (default 3000)
 - TAX_RATE: decimal tax rate (example: 0.1)
+- FRONTEND_ORIGINS: comma-separated allowlist for browser clients (example: http://localhost:5173,http://localhost:5174,http://localhost:3001)
+- CLOUDINARY_CLOUD_NAME: Cloudinary cloud name
+- CLOUDINARY_API_KEY: Cloudinary API key
+- CLOUDINARY_API_SECRET: Cloudinary API secret
+- MAIL_MODE: `log` (default) or `smtp`
+- MAIL_FROM: sender address for notifications
+- SMTP_HOST: SMTP server host (required in `smtp` mode)
+- SMTP_PORT: SMTP server port (default `587`)
+- SMTP_USER: SMTP username (required in `smtp` mode)
+- SMTP_PASS: SMTP password (required in `smtp` mode)
+- SMTP_SECURE: `true` for SMTPS/465, else `false`
 
 Do not commit real secrets.
+
+## Image Upload (Cloudinary)
+
+Menu and ingredient images are uploaded as multipart files, stored in Cloudinary,
+and only the resulting secure URL is saved in PostgreSQL.
+
+### How It Works
+
+- Admin uploads image to `POST /menu/:id/image` or `POST /ingredients/:id/image`
+- API validates type (`image/jpeg`, `image/png`, `image/webp`) and max size (5 MB)
+- API streams image to Cloudinary using the official SDK
+- API updates `imageUrl` on the related record in PostgreSQL
+- API returns standard contract: `{ "success": true, "data": { "imageUrl": "..." } }`
+
+### Required Environment Variables
+
+- `CLOUDINARY_CLOUD_NAME`
+- `CLOUDINARY_API_KEY`
+- `CLOUDINARY_API_SECRET`
+
+### Postman Example (Menu Image)
+
+Request:
+
+- Method: `POST`
+- URL: `http://localhost:3000/menu/<menuItemId>/image`
+- Auth: `Bearer <admin_jwt>`
+- Body: `form-data`
+  - Key: `file` (type: File)
+  - Value: choose `.jpg`, `.png`, or `.webp` image <= 5 MB
+
+Expected response:
+
+```json
+{
+  "success": true,
+  "data": {
+    "imageUrl": "https://res.cloudinary.com/..."
+  }
+}
+```
 
 ## Docker Commands
 
@@ -179,6 +231,14 @@ Main response envelopes:
 - Success: { "success": true, "data": ... }
 - Error: { "success": false, "error": "ERROR_CODE", "message": "..." }
 - Paginated: { "success": true, "data": [...], "meta": { "page": 1, "limit": 10, "total": 120 } }
+
+## Client Portal Highlights
+
+- Menu filtering supports `availableOnly`, `categoryId`, `search`, `vegetarian`, `halal`, and `glutenFree`.
+- Cart supports add, clear, update line quantity, and remove single line before checkout.
+- Order confirmation and reservation confirmation/reminder emails are event-driven and non-blocking.
+- Mail delivery supports `log` mode for development and `smtp` mode for production.
+- Loyalty can auto-apply a checkout discount when the client has enough points (can be opted out per order request).
 
 ## Smoke and Validation
 

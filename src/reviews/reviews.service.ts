@@ -4,9 +4,10 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { OrderStatus } from '../common/constants/domain-enums';
+import { OrderStatus, ReviewType } from '../common/constants/domain-enums';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateReviewDto } from './dto/create-review.dto';
+import { CreateServiceReviewDto } from './dto/create-service-review.dto';
 
 @Injectable()
 export class ReviewsService {
@@ -61,6 +62,7 @@ export class ReviewsService {
         orderId: dto.orderId,
         orderItemId: dto.orderItemId,
         menuItemId: dto.menuItemId,
+        type: ReviewType.DISH,
         rating: dto.rating,
         comment: dto.comment,
       },
@@ -83,7 +85,10 @@ export class ReviewsService {
 
   getMenuItemReviews(menuItemId: string) {
     return this.prisma.review.findMany({
-      where: { menuItemId },
+      where: {
+        menuItemId,
+        type: ReviewType.DISH,
+      },
       orderBy: {
         createdAt: 'desc',
       },
@@ -100,7 +105,9 @@ export class ReviewsService {
 
   getMyReviews(userId: string) {
     return this.prisma.review.findMany({
-      where: { userId },
+      where: {
+        userId,
+      },
       orderBy: {
         createdAt: 'desc',
       },
@@ -109,6 +116,94 @@ export class ReviewsService {
           select: {
             id: true,
             name: true,
+          },
+        },
+      },
+    });
+  }
+
+  async createServiceReview(userId: string, dto: CreateServiceReviewDto) {
+    const targetOrder = dto.orderId
+      ? await this.prisma.order.findUnique({
+          where: { id: dto.orderId },
+          select: {
+            id: true,
+            customerId: true,
+            status: true,
+          },
+        })
+      : await this.prisma.order.findFirst({
+          where: {
+            customerId: userId,
+            status: OrderStatus.COMPLETED,
+          },
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            customerId: true,
+            status: true,
+          },
+        });
+
+    if (!targetOrder) {
+      throw new NotFoundException('Completed order not found for service review');
+    }
+
+    if (targetOrder.customerId !== userId) {
+      throw new ForbiddenException();
+    }
+
+    if (targetOrder.status !== OrderStatus.COMPLETED) {
+      throw new ConflictException('REVIEW_NOT_ELIGIBLE');
+    }
+
+    const duplicate = await this.prisma.review.findFirst({
+      where: {
+        userId,
+        orderId: targetOrder.id,
+        type: ReviewType.SERVICE,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (duplicate) {
+      throw new ConflictException('DUPLICATE_REVIEW');
+    }
+
+    return this.prisma.review.create({
+      data: {
+        userId,
+        orderId: targetOrder.id,
+        type: ReviewType.SERVICE,
+        rating: dto.rating,
+        comment: dto.comment,
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            fullName: true,
+          },
+        },
+      },
+    });
+  }
+
+  getServiceReviews() {
+    return this.prisma.review.findMany({
+      where: {
+        type: ReviewType.SERVICE,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            fullName: true,
           },
         },
       },

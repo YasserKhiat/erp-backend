@@ -20,6 +20,7 @@ import {
   ApiContractOk,
 } from '../common/swagger/api-contract.decorators';
 import { CreateReviewDto } from './dto/create-review.dto';
+import { CreateServiceReviewDto } from './dto/create-service-review.dto';
 import { ReviewsService } from './reviews.service';
 
 @ApiTags('reviews')
@@ -40,6 +41,17 @@ export class ReviewsController {
   ) {
     return this.reviewsService
       .getMenuItemReviews(menuItemId)
+      .then((items) => paginateArray(items, pagination));
+  }
+
+  @Get('service')
+  @ApiOperation({ summary: 'List global service reviews' })
+  @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
+  @ApiContractListOk({ description: 'Paginated global service reviews.' })
+  getServiceReviews(@Query() pagination?: PaginationQueryDto) {
+    return this.reviewsService
+      .getServiceReviews()
       .then((items) => paginateArray(items, pagination));
   }
 
@@ -72,5 +84,19 @@ export class ReviewsController {
     @Body() dto: CreateReviewDto,
   ) {
     return this.reviewsService.createReview(user.id, dto);
+  }
+
+  @Post('service')
+  @ApiOperation({ summary: 'Create global service review' })
+  @ApiBody({ type: CreateServiceReviewDto })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.CLIENT)
+  @ApiContractOk({ description: 'Service review created.', dataSchema: { type: 'object' } })
+  createServiceReview(
+    @CurrentUser() user: { id: string },
+    @Body() dto: CreateServiceReviewDto,
+  ) {
+    return this.reviewsService.createServiceReview(user.id, dto);
   }
 }

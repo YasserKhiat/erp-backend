@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateFormulaBundleDto } from './dto/create-formula-bundle.dto';
 import { CreateCategoryDto } from './dto/create-category.dto';
@@ -13,7 +14,10 @@ import { SetMenuItemRecipeDto } from './dto/set-menu-item-recipe.dto';
 
 @Injectable()
 export class MenuService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cloudinaryService: CloudinaryService,
+  ) {}
 
   createCategory(dto: CreateCategoryDto) {
     return this.prisma.category.create({
@@ -21,6 +25,80 @@ export class MenuService {
         name: dto.name,
       },
     });
+  }
+
+  private canProduceMenuItem(recipeLines: Array<{ quantityNeeded: Prisma.Decimal; ingredient: { inventory: { currentStock: Prisma.Decimal } | null } }>): boolean {
+    if (recipeLines.length === 0) {
+      return false;
+    }
+
+    return recipeLines.every((line) => {
+      const available = Number(line.ingredient.inventory?.currentStock ?? 0);
+      return available >= Number(line.quantityNeeded);
+    });
+  }
+
+  async recalculateMenuItemAvailability(menuItemId: string) {
+    const menuItem = await this.prisma.menuItem.findUnique({
+      where: { id: menuItemId },
+      include: {
+        ingredients: {
+          include: {
+            ingredient: {
+              include: {
+                inventory: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!menuItem) {
+      throw new NotFoundException('Menu item not found');
+    }
+
+    const isAvailable = this.canProduceMenuItem(menuItem.ingredients);
+
+    return this.prisma.menuItem.update({
+      where: { id: menuItemId },
+      data: {
+        isAvailable,
+      },
+    });
+  }
+
+  async recalculateAllMenuAvailability() {
+    const menuItems = await this.prisma.menuItem.findMany({
+      include: {
+        ingredients: {
+          include: {
+            ingredient: {
+              include: {
+                inventory: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const updates = menuItems.map((item) =>
+      this.prisma.menuItem.update({
+        where: { id: item.id },
+        data: {
+          isAvailable: this.canProduceMenuItem(item.ingredients),
+        },
+      }),
+    );
+
+    if (updates.length > 0) {
+      await this.prisma.$transaction(updates);
+    }
+
+    return {
+      updated: updates.length,
+    };
   }
 
   createMenuItem(dto: CreateMenuItemDto) {
@@ -31,6 +109,9 @@ export class MenuService {
         price: dto.price,
         categoryId: dto.categoryId,
         isAvailable: dto.isAvailable ?? true,
+        vegetarian: dto.vegetarian ?? false,
+        halal: dto.halal ?? false,
+        glutenFree: dto.glutenFree ?? false,
       },
     });
   }
@@ -48,11 +129,17 @@ export class MenuService {
 
   getMenu(filters: {
     availableOnly?: boolean;
+    vegetarian?: boolean;
+    halal?: boolean;
+    glutenFree?: boolean;
     categoryId?: string;
     search?: string;
   }) {
     const where: Prisma.MenuItemWhereInput = {
       ...(filters.availableOnly ? { isAvailable: true } : {}),
+      ...(filters.vegetarian ? { vegetarian: true } : {}),
+      ...(filters.halal ? { halal: true } : {}),
+      ...(filters.glutenFree ? { glutenFree: true } : {}),
       ...(filters.categoryId ? { categoryId: filters.categoryId } : {}),
       ...(filters.search
         ? {
@@ -81,6 +168,45 @@ export class MenuService {
       },
       orderBy: {
         name: 'asc',
+      },
+    });
+  }
+
+  async getMenuItemById(menuItemId: string) {
+    const menuItem = await this.prisma.menuItem.findUnique({
+      where: { id: menuItemId },
+      include: {
+        category: true,
+      },
+    });
+
+    if (!menuItem) {
+      throw new NotFoundException('Menu item not found');
+    }
+
+    return menuItem;
+  }
+
+  async uploadMenuItemImage(menuItemId: string, file: Express.Multer.File) {
+    const menuItem = await this.prisma.menuItem.findUnique({
+      where: { id: menuItemId },
+      select: { id: true },
+    });
+
+    if (!menuItem) {
+      throw new NotFoundException('Menu item not found');
+    }
+
+    const imageUrl = await this.cloudinaryService.uploadImage(
+      file,
+      `menu-items/${menuItemId}`,
+    );
+
+    return this.prisma.menuItem.update({
+      where: { id: menuItemId },
+      data: { imageUrl },
+      select: {
+        imageUrl: true,
       },
     });
   }
@@ -121,6 +247,8 @@ export class MenuService {
         })),
       }),
     ]);
+
+    await this.recalculateMenuItemAvailability(menuItemId);
 
     return this.getMenuItemRecipe(menuItemId);
   }
