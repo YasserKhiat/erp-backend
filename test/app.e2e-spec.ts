@@ -10,6 +10,9 @@ const request = require('supertest');
 
 process.env.JWT_SECRET ??= 'e2e-jwt-secret';
 process.env.JWT_EXPIRES_IN ??= '1d';
+process.env.CLOUDINARY_CLOUD_NAME ??= 'e2e-cloud';
+process.env.CLOUDINARY_API_KEY ??= 'e2e-key';
+process.env.CLOUDINARY_API_SECRET ??= 'e2e-secret';
 
 jest.setTimeout(30_000);
 
