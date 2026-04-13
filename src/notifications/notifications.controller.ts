@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Patch, Post, Query, Body, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, MessageEvent, Param, Patch, Post, Query, Sse, UseGuards } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiBody,
@@ -20,7 +20,9 @@ import {
 } from '../common/swagger/api-contract.decorators';
 import { CreateTestNotificationDto } from './dto/create-test-notification.dto';
 import { ListNotificationsQueryDto } from './dto/list-notifications-query.dto';
+import { NotificationsRealtimeService } from './notifications-realtime.service';
 import { NotificationsService } from './notifications.service';
+import { Observable } from 'rxjs';
 
 @ApiTags('notifications')
 @ApiBearerAuth()
@@ -28,7 +30,10 @@ import { NotificationsService } from './notifications.service';
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('notifications')
 export class NotificationsController {
-  constructor(private readonly notificationsService: NotificationsService) {}
+  constructor(
+    private readonly notificationsService: NotificationsService,
+    private readonly notificationsRealtimeService: NotificationsRealtimeService,
+  ) {}
 
   @Get('me')
   @ApiOperation({ summary: 'List notifications for current user' })
@@ -54,6 +59,18 @@ export class NotificationsController {
     @Query() query?: ListNotificationsQueryDto,
   ) {
     return this.notificationsService.listMyNotifications(user.id, query);
+  }
+
+  @Sse('stream')
+  @ApiOperation({ summary: 'Live notification stream for current user (SSE)' })
+  @Roles(
+    DomainUserRole.CLIENT,
+    DomainUserRole.EMPLOYEE,
+    DomainUserRole.MANAGER,
+    DomainUserRole.ADMIN,
+  )
+  streamNotifications(@CurrentUser() user: { id: string }): Observable<MessageEvent> {
+    return this.notificationsRealtimeService.streamForUser(user.id);
   }
 
   @Get('me/unread-count')

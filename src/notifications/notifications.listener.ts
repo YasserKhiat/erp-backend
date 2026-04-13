@@ -7,9 +7,12 @@ import {
 } from '@prisma/client';
 import {
   LoyaltyUpdatedEvent,
+  OrderCancelledEvent,
+  OrderCompletedEvent,
   OrderConfirmedEvent,
   PaymentCompletedEvent,
   ReservationCreatedEvent,
+  ReservationStatusUpdatedEvent,
   StockLowEvent,
 } from '../orders/events';
 import { PrismaService } from '../prisma/prisma.service';
@@ -146,6 +149,120 @@ export class NotificationsListener {
     } catch (error) {
       this.logger.error(
         `Failed reservation notification side effects for reservation ${event.reservation.id}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+    }
+  }
+
+  @OnEvent('reservation.status.updated')
+  async onReservationStatusUpdated(event: ReservationStatusUpdatedEvent) {
+    try {
+      if (event.reservation.userId) {
+        await this.notificationsService.notifyUser(event.reservation.userId, {
+          type: NotificationType.RESERVATION,
+          priority: NotificationPriority.INFO,
+          title: 'Reservation status updated',
+          message: `Reservation ${event.reservation.id} changed from ${event.reservation.previousStatus} to ${event.reservation.nextStatus}.`,
+          actionUrl: '/reservations/me',
+          metadata: {
+            reservationId: event.reservation.id,
+            previousStatus: event.reservation.previousStatus,
+            nextStatus: event.reservation.nextStatus,
+            startAt: event.reservation.startAt,
+            endAt: event.reservation.endAt,
+          },
+        });
+      }
+
+      await this.notificationsService.notifyRoles([UserRole.MANAGER, UserRole.EMPLOYEE], {
+        type: NotificationType.RESERVATION,
+        priority: NotificationPriority.INFO,
+        title: 'Reservation status changed',
+        message: `Reservation ${event.reservation.id} changed to ${event.reservation.nextStatus}.`,
+        actionUrl: '/reservations',
+        metadata: {
+          reservationId: event.reservation.id,
+          previousStatus: event.reservation.previousStatus,
+          nextStatus: event.reservation.nextStatus,
+        },
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed reservation status notification side effects for reservation ${event.reservation.id}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+    }
+  }
+
+  @OnEvent('order.completed')
+  async onOrderCompleted(event: OrderCompletedEvent) {
+    try {
+      await this.notificationsService.notifyRoles([UserRole.MANAGER, UserRole.EMPLOYEE], {
+        type: NotificationType.ORDER,
+        priority: NotificationPriority.INFO,
+        title: `Order #${event.order.orderNumber} completed`,
+        message: `Order ${event.order.orderNumber} was completed successfully.`,
+        actionUrl: `/orders/${event.order.id}`,
+        metadata: {
+          orderId: event.order.id,
+          orderNumber: event.order.orderNumber,
+          status: 'COMPLETED',
+        },
+      });
+
+      await this.notificationsService.notifyUser(event.order.customerId, {
+        type: NotificationType.ORDER,
+        priority: NotificationPriority.INFO,
+        title: `Your order #${event.order.orderNumber} is completed`,
+        message: `Order ${event.order.orderNumber} is now completed.`,
+        actionUrl: `/orders/${event.order.id}/tracking`,
+        metadata: {
+          orderId: event.order.id,
+          orderNumber: event.order.orderNumber,
+          status: 'COMPLETED',
+        },
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed order completed notification side effects for order ${event.order.id}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+    }
+  }
+
+  @OnEvent('order.cancelled')
+  async onOrderCancelled(event: OrderCancelledEvent) {
+    try {
+      await this.notificationsService.notifyRoles([UserRole.MANAGER, UserRole.EMPLOYEE], {
+        type: NotificationType.ORDER,
+        priority: NotificationPriority.WARNING,
+        title: `Order #${event.order.orderNumber} cancelled`,
+        message: `Order ${event.order.orderNumber} has been cancelled.`,
+        actionUrl: `/orders/${event.order.id}`,
+        metadata: {
+          orderId: event.order.id,
+          orderNumber: event.order.orderNumber,
+          status: 'CANCELLED',
+        },
+      });
+
+      if (event.order.customerId) {
+        await this.notificationsService.notifyUser(event.order.customerId, {
+          type: NotificationType.ORDER,
+          priority: NotificationPriority.WARNING,
+          title: `Your order #${event.order.orderNumber} was cancelled`,
+          message: `Order ${event.order.orderNumber} has been cancelled.`,
+          actionUrl: `/orders/${event.order.id}/tracking`,
+          metadata: {
+            orderId: event.order.id,
+            orderNumber: event.order.orderNumber,
+            status: 'CANCELLED',
+          },
+        });
+      }
+    } catch (error) {
+      this.logger.error(
+        `Failed order cancelled notification side effects for order ${event.order.id}`,
         error instanceof Error ? error.stack : undefined,
       );
     }

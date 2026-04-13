@@ -6,6 +6,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
+import PDFDocument = require('pdfkit');
 import { Prisma } from '@prisma/client';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -29,6 +30,7 @@ import {
   OrderCompletedEvent,
   OrderCreatedEvent,
 } from './events';
+import { AuditLogService } from '../audit/audit-log.service';
 
 @Injectable()
 export class OrdersService {
@@ -40,6 +42,7 @@ export class OrdersService {
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly auditLogService: AuditLogService,
   ) {}
 
   private getTaxRate(): number {
@@ -523,6 +526,19 @@ export class OrdersService {
     this.logger.log(`Emitting order.confirmed for order ${order.id}`);
     this.eventEmitter.emit('order.confirmed', confirmedEvent);
 
+    this.auditLogService.log({
+      userId: user.id,
+      action: 'order.created',
+      entity: 'order',
+      entityId: order.id,
+      metadata: {
+        orderNumber: order.orderNumber,
+        orderType: order.orderType,
+        status: order.status,
+        total: Number(order.total),
+      },
+    });
+
     return order;
   }
 
@@ -599,7 +615,175 @@ export class OrdersService {
     };
   }
 
-  async updateOrderStatus(orderId: string, dto: UpdateOrderStatusDto) {
+  private async getOrderForInvoice(orderId: string, user: { id: string; role: UserRole }) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        customer: {
+          select: {
+            id: true,
+            email: true,
+            fullName: true,
+          },
+        },
+        items: {
+          include: {
+            menuItem: true,
+          },
+        },
+        payments: {
+          orderBy: {
+            createdAt: 'asc',
+          },
+        },
+        table: true,
+      },
+    });
+
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+
+    const canAccessAll = user.role === UserRole.ADMIN || user.role === UserRole.MANAGER;
+    const isOwnOrder = user.role === UserRole.CLIENT && order.customerId === user.id;
+
+    if (!canAccessAll && !isOwnOrder) {
+      throw new ForbiddenException();
+    }
+
+    return order;
+  }
+
+  async getOrderInvoice(orderId: string, user: { id: string; role: UserRole }) {
+    const order = await this.getOrderForInvoice(orderId, user);
+    const paidTotal = this.roundMoney(
+      order.payments
+        .filter((payment) => payment.status === 'PAID')
+        .reduce((acc, payment) => acc + Number(payment.amount), 0),
+    );
+
+    return {
+      invoiceNumber: order.billNumber ?? `BILL-${order.orderNumber}`,
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+      orderType: order.orderType,
+      orderStatus: order.status,
+      issuedAt: order.billedAt ?? order.updatedAt,
+      customer: order.customer
+        ? {
+            id: order.customer.id,
+            fullName: order.customer.fullName,
+            email: order.customer.email,
+          }
+        : null,
+      table: order.table
+        ? {
+            id: order.table.id,
+            code: order.table.code,
+          }
+        : null,
+      items: order.items.map((item) => ({
+        id: item.id,
+        menuItemId: item.menuItemId,
+        menuItemName: item.menuItem.name,
+        quantity: item.quantity,
+        unitPrice: Number(item.unitPrice),
+        lineTotal: Number(item.totalPrice),
+      })),
+      totals: {
+        subtotal: Number(order.subtotal),
+        tax: Number(order.tax),
+        loyaltyDiscount: Number(order.loyaltyDiscount),
+        total: Number(order.total),
+        paidTotal,
+        remaining: Math.max(0, this.roundMoney(Number(order.total) - paidTotal)),
+      },
+      payments: order.payments.map((payment) => ({
+        id: payment.id,
+        amount: Number(payment.amount),
+        method: payment.method,
+        status: payment.status,
+        transactionRef: payment.transactionRef,
+        createdAt: payment.createdAt,
+      })),
+    };
+  }
+
+  async getOrderInvoicePdf(orderId: string, user: { id: string; role: UserRole }): Promise<Buffer> {
+    const invoice = await this.getOrderInvoice(orderId, user);
+    const doc = new PDFDocument({ size: 'A4', margin: 40 });
+    const chunks: Buffer[] = [];
+
+    return new Promise<Buffer>((resolve, reject) => {
+      doc.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
+      doc.on('error', reject);
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+
+      doc.fontSize(20).text('Invoice', { align: 'left' });
+      doc.moveDown(0.5);
+      doc.fontSize(11).text(`Invoice #: ${invoice.invoiceNumber}`);
+      doc.text(`Order #: ${invoice.orderNumber}`);
+      doc.text(`Issued at: ${new Date(invoice.issuedAt).toLocaleString()}`);
+      doc.text(`Order type: ${invoice.orderType}`);
+      doc.text(`Order status: ${invoice.orderStatus}`);
+      doc.moveDown(0.5);
+
+      if (invoice.customer) {
+        doc.fontSize(12).text('Customer', { underline: true });
+        doc.fontSize(11).text(invoice.customer.fullName);
+        doc.text(invoice.customer.email);
+      } else {
+        doc.fontSize(12).text('Customer', { underline: true });
+        doc.fontSize(11).text('Walk-in / not linked');
+      }
+
+      if (invoice.table) {
+        doc.text(`Table: ${invoice.table.code}`);
+      }
+
+      doc.moveDown(1);
+      doc.fontSize(12).text('Items', { underline: true });
+      doc.moveDown(0.4);
+
+      for (const item of invoice.items) {
+        doc
+          .fontSize(10)
+          .text(
+            `${item.menuItemName}  x${item.quantity}  @ ${item.unitPrice.toFixed(2)}  = ${item.lineTotal.toFixed(2)}`,
+          );
+      }
+
+      doc.moveDown(1);
+      doc.fontSize(12).text('Totals', { underline: true });
+      doc.fontSize(10).text(`Subtotal: ${invoice.totals.subtotal.toFixed(2)}`);
+      doc.text(`Tax: ${invoice.totals.tax.toFixed(2)}`);
+      doc.text(`Loyalty discount: ${invoice.totals.loyaltyDiscount.toFixed(2)}`);
+      doc.text(`Total: ${invoice.totals.total.toFixed(2)}`);
+      doc.text(`Paid: ${invoice.totals.paidTotal.toFixed(2)}`);
+      doc.text(`Remaining: ${invoice.totals.remaining.toFixed(2)}`);
+
+      doc.moveDown(1);
+      doc.fontSize(12).text('Payments', { underline: true });
+      doc.moveDown(0.3);
+      if (invoice.payments.length === 0) {
+        doc.fontSize(10).text('No payments registered yet.');
+      } else {
+        for (const payment of invoice.payments) {
+          doc
+            .fontSize(10)
+            .text(
+              `${new Date(payment.createdAt).toLocaleString()}  ${payment.method}  ${payment.status}  ${payment.amount.toFixed(2)}${
+                payment.transactionRef ? `  ref: ${payment.transactionRef}` : ''
+              }`,
+            );
+        }
+      }
+
+      doc.end();
+    });
+  }
+
+  async updateOrderStatus(orderId: string, dto: UpdateOrderStatusDto, actorId?: string) {
     const existing = await this.prisma.order.findUnique({
       where: { id: orderId },
       include: { items: true },
@@ -642,6 +826,18 @@ export class OrdersService {
       }
 
       return order;
+    });
+
+    this.auditLogService.log({
+      userId: actorId ?? null,
+      action: 'order.status.updated',
+      entity: 'order',
+      entityId: updated.id,
+      metadata: {
+        orderNumber: updated.orderNumber,
+        previousStatus: existing.status,
+        nextStatus: dto.status,
+      },
     });
 
     if (dto.status === OrderStatus.COMPLETED && updated.customerId) {

@@ -99,6 +99,8 @@ Only list endpoints return `meta`.
 - `GET /orders/history`
 - `GET /orders/:orderId`
 - `GET /orders/:orderId/tracking`
+- `GET /orders/:orderId/invoice` (client owner or admin/manager)
+- `GET /orders/:orderId/invoice/pdf` (downloadable PDF)
 
 ### Reservations
 
@@ -145,6 +147,7 @@ Only list endpoints return `meta`.
 - `GET /notifications/me/unread-count`
 - `PATCH /notifications/:id/read`
 - `PATCH /notifications/me/read-all`
+- `GET /notifications/stream` (SSE live stream)
 
 ## 7) Important Response Shape Notes
 
@@ -219,7 +222,7 @@ Returns paginated rows sorted by newest first.
 - Loyalty redemption requires sufficient points.
 - Reservation transitions and edit/cancel rules are validated server-side.
 - Notifications are generated from domain events (order/payment/reservation/stock/loyalty),
-  so frontend should poll `/notifications/me` and unread count instead of assuming synchronous creation in request handlers.
+  and can be consumed by either polling (`/notifications/me`) or live stream (`/notifications/stream`).
 
 ## 9) Seeded Accounts
 

@@ -13,6 +13,7 @@ import { resolvePagination } from '../common/utils/pagination';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateTestNotificationDto } from './dto/create-test-notification.dto';
 import { ListNotificationsQueryDto } from './dto/list-notifications-query.dto';
+import { NotificationsRealtimeService } from './notifications-realtime.service';
 
 type CreateNotificationInput = {
   type: NotificationType;
@@ -25,7 +26,10 @@ type CreateNotificationInput = {
 
 @Injectable()
 export class NotificationsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificationsRealtimeService: NotificationsRealtimeService,
+  ) {}
 
   async notifyUser(userId: string, input: CreateNotificationInput) {
     return this.notifyUsers([userId], input);
@@ -37,7 +41,7 @@ export class NotificationsService {
       return null;
     }
 
-    return this.prisma.notification.create({
+    const created = await this.prisma.notification.create({
       data: {
         type: input.type,
         priority: input.priority ?? NotificationPriority.INFO,
@@ -57,6 +61,22 @@ export class NotificationsService {
         },
       },
     });
+
+    for (const userId of recipients) {
+      this.notificationsRealtimeService.publishToUser(userId, {
+        id: created.id,
+        type: created.type,
+        priority: created.priority,
+        title: created.title,
+        message: created.message,
+        actionUrl: created.actionUrl,
+        metadata: created.metadata,
+        isRead: false,
+        createdAt: created.createdAt,
+      });
+    }
+
+    return created;
   }
 
   async notifyRoles(roles: UserRole[], input: CreateNotificationInput) {
