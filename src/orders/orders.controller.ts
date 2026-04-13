@@ -23,10 +23,11 @@ import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { paginateArray } from '../common/utils/pagination';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
-import { UserRole } from '../common/constants/domain-enums';
+import { OrderStatus, OrderType, UserRole } from '../common/constants/domain-enums';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
 import { AddCartItemDto } from './dto/add-cart-item.dto';
+import { OrdersQueryDto } from './dto/orders-query.dto';
 import { PlaceOrderDto } from './dto/place-order.dto';
 import { RemoveOrderItemDto } from './dto/remove-order-item.dto';
 import { UpdateCartItemDto } from './dto/update-cart-item.dto';
@@ -101,6 +102,20 @@ export class OrdersController {
     @Body() dto: PlaceOrderDto,
   ) {
     return this.ordersService.placeOrder(user, dto);
+  }
+
+  @Get()
+  @ApiOperation({ summary: 'List orders for backoffice' })
+  @ApiQuery({ name: 'status', required: false, enum: Object.values(OrderStatus) })
+  @ApiQuery({ name: 'orderType', required: false, enum: Object.values(OrderType) })
+  @ApiQuery({ name: 'search', required: false, type: String })
+  @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
+  @ApiContractListOk({ description: 'Paginated global orders list for backoffice.' })
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.EMPLOYEE)
+  listBackofficeOrders(@Query() query: OrdersQueryDto) {
+    return this.ordersService.listBackofficeOrders(query);
   }
 
   @Get('history')

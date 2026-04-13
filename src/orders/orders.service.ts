@@ -20,6 +20,7 @@ import {
 } from '../common/constants/domain-enums';
 import { AddCartItemDto } from './dto/add-cart-item.dto';
 import { PlaceOrderDto } from './dto/place-order.dto';
+import { OrdersQueryDto } from './dto/orders-query.dto';
 import { RemoveOrderItemDto } from './dto/remove-order-item.dto';
 import { UpdateCartItemDto } from './dto/update-cart-item.dto';
 import { UpdateOrderItemDto } from './dto/update-order-item.dto';
@@ -552,6 +553,126 @@ export class OrdersService {
       },
       orderBy: { createdAt: 'desc' },
     });
+  }
+
+  async listBackofficeOrders(query: OrdersQueryDto) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 10;
+    const skip = (page - 1) * limit;
+
+    const where: Prisma.OrderWhereInput = {};
+
+    if (query.status) {
+      where.status = query.status;
+    }
+
+    if (query.orderType) {
+      where.orderType = query.orderType;
+    }
+
+    const trimmedSearch = query.search?.trim();
+    if (trimmedSearch) {
+      const numericSearch = Number(trimmedSearch);
+      const searchOr: Prisma.OrderWhereInput[] = [
+        {
+          id: {
+            contains: trimmedSearch,
+            mode: 'insensitive',
+          },
+        },
+        {
+          billNumber: {
+            contains: trimmedSearch,
+            mode: 'insensitive',
+          },
+        },
+        {
+          customer: {
+            is: {
+              email: {
+                contains: trimmedSearch,
+                mode: 'insensitive',
+              },
+            },
+          },
+        },
+        {
+          customer: {
+            is: {
+              fullName: {
+                contains: trimmedSearch,
+                mode: 'insensitive',
+              },
+            },
+          },
+        },
+        {
+          table: {
+            is: {
+              code: {
+                contains: trimmedSearch,
+                mode: 'insensitive',
+              },
+            },
+          },
+        },
+      ];
+
+      if (Number.isInteger(numericSearch)) {
+        searchOr.push({ orderNumber: numericSearch });
+      }
+
+      where.OR = searchOr;
+    }
+
+    const [total, orders] = await this.prisma.$transaction([
+      this.prisma.order.count({ where }),
+      this.prisma.order.findMany({
+        where,
+        include: {
+          customer: {
+            select: {
+              id: true,
+              email: true,
+              fullName: true,
+            },
+          },
+          table: {
+            select: {
+              id: true,
+              code: true,
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+    ]);
+
+    return {
+      data: orders.map((order) => ({
+        id: order.id,
+        orderNumber: order.orderNumber,
+        status: order.status,
+        orderType: order.orderType,
+        subtotal: Number(order.subtotal),
+        tax: Number(order.tax),
+        loyaltyDiscount: Number(order.loyaltyDiscount),
+        total: Number(order.total),
+        billNumber: order.billNumber,
+        billedAt: order.billedAt,
+        createdAt: order.createdAt,
+        updatedAt: order.updatedAt,
+        customer: order.customer,
+        table: order.table,
+      })),
+      meta: {
+        page,
+        limit,
+        total,
+      },
+    };
   }
 
   async getOrder(orderId: string, user?: { id: string; role: UserRole }) {
