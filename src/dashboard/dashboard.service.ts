@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import ExcelJS from 'exceljs';
-import PDFDocument from 'pdfkit';
+import ExcelJS = require('exceljs');
+import PDFDocument = require('pdfkit');
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { OrderStatus, PaymentStatus } from '../common/constants/domain-enums';
