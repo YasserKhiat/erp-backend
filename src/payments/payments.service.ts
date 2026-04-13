@@ -23,6 +23,7 @@ import { PaymentCompletedEvent } from '../orders/events';
 import { ListPaymentsQueryDto } from './dto/list-payments-query.dto';
 import { CreateBankMovementDto } from './dto/create-bank-movement.dto';
 import { RunReconciliationDto } from './dto/run-reconciliation.dto';
+import { AuditLogService } from '../audit/audit-log.service';
 
 @Injectable()
 export class PaymentsService {
@@ -31,6 +32,7 @@ export class PaymentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly auditLogService: AuditLogService,
   ) {}
 
   private roundMoney(value: number): number {
@@ -218,6 +220,20 @@ export class PaymentsService {
       isFullyPaid,
     });
 
+    this.auditLogService.log({
+      userId,
+      action: 'payment.created',
+      entity: 'payment',
+      entityId: payment.id,
+      metadata: {
+        orderId: dto.orderId,
+        amount: dto.amount,
+        method: dto.method,
+        orderPaidTotal: newPaidTotal,
+        isFullyPaid,
+      },
+    });
+
     return {
       payment,
       summary: {
@@ -278,6 +294,20 @@ export class PaymentsService {
       this.emitPaymentCompletedEvent(payment, order, {
         paidTotal: runningTotal,
         isFullyPaid: runningTotal >= orderTotal,
+      });
+
+      this.auditLogService.log({
+        userId,
+        action: 'payment.created',
+        entity: 'payment',
+        entityId: payment.id,
+        metadata: {
+          orderId: dto.orderId,
+          amount: Number(payment.amount),
+          method: payment.method,
+          orderPaidTotal: runningTotal,
+          isFullyPaid: runningTotal >= orderTotal,
+        },
       });
     }
 

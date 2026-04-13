@@ -9,12 +9,13 @@ import {
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../prisma/prisma.service';
 import { ReservationStatus, UserRole } from '../common/constants/domain-enums';
-import { ReservationCreatedEvent } from '../orders/events';
+import { ReservationCreatedEvent, ReservationStatusUpdatedEvent } from '../orders/events';
 import { CreateReservationDto } from './dto/create-reservation.dto';
 import { ListReservationsQueryDto } from './dto/list-reservations-query.dto';
 import { ReservationAvailabilityQueryDto } from './dto/reservation-availability-query.dto';
 import { UpdateReservationDto } from './dto/update-reservation.dto';
 import { UpdateReservationStatusDto } from './dto/update-reservation-status.dto';
+import { AuditLogService } from '../audit/audit-log.service';
 
 @Injectable()
 export class ReservationsService {
@@ -23,6 +24,7 @@ export class ReservationsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly auditLogService: AuditLogService,
   ) {}
 
   private readonly activeStatuses: ReservationStatus[] = [
@@ -172,6 +174,19 @@ export class ReservationsService {
       },
     } as ReservationCreatedEvent);
 
+    this.auditLogService.log({
+      userId: actor.id,
+      action: 'reservation.created',
+      entity: 'reservation',
+      entityId: reservation.id,
+      metadata: {
+        tableId: reservation.tableId,
+        guestCount: reservation.guestCount,
+        startAt: reservation.startAt.toISOString(),
+        endAt: reservation.endAt.toISOString(),
+      },
+    });
+
     return reservation;
   }
 
@@ -294,7 +309,7 @@ export class ReservationsService {
       throw new ConflictException('INVALID_RESERVATION_STATUS');
     }
 
-    return this.prisma.reservation.update({
+    const updated = await this.prisma.reservation.update({
       where: { id: reservationId },
       data: {
         status: ReservationStatus.CANCELLED,
@@ -305,11 +320,37 @@ export class ReservationsService {
         user: true,
       },
     });
+
+    this.auditLogService.log({
+      userId: actor.id,
+      action: 'reservation.cancelled',
+      entity: 'reservation',
+      entityId: updated.id,
+      metadata: {
+        previousStatus: reservation.status,
+        nextStatus: updated.status,
+      },
+    });
+
+    this.eventEmitter.emit('reservation.status.updated', {
+      reservation: {
+        id: updated.id,
+        userId: updated.userId ?? undefined,
+        tableId: updated.tableId,
+        previousStatus: reservation.status,
+        nextStatus: updated.status,
+        startAt: updated.startAt.toISOString(),
+        endAt: updated.endAt.toISOString(),
+      },
+    } as ReservationStatusUpdatedEvent);
+
+    return updated;
   }
 
   async updateReservationStatus(
     reservationId: string,
     dto: UpdateReservationStatusDto,
+    actorId?: string,
   ) {
     const reservation = await this.prisma.reservation.findUnique({
       where: { id: reservationId },
@@ -327,7 +368,7 @@ export class ReservationsService {
       throw new ConflictException('INVALID_RESERVATION_STATUS');
     }
 
-    return this.prisma.reservation.update({
+    const updated = await this.prisma.reservation.update({
       where: { id: reservationId },
       data: {
         status: dto.status,
@@ -340,5 +381,30 @@ export class ReservationsService {
         user: true,
       },
     });
+
+    this.auditLogService.log({
+      userId: actorId ?? null,
+      action: 'reservation.status.updated',
+      entity: 'reservation',
+      entityId: updated.id,
+      metadata: {
+        previousStatus: reservation.status,
+        nextStatus: updated.status,
+      },
+    });
+
+    this.eventEmitter.emit('reservation.status.updated', {
+      reservation: {
+        id: updated.id,
+        userId: updated.userId ?? undefined,
+        tableId: updated.tableId,
+        previousStatus: reservation.status,
+        nextStatus: updated.status,
+        startAt: updated.startAt.toISOString(),
+        endAt: updated.endAt.toISOString(),
+      },
+    } as ReservationStatusUpdatedEvent);
+
+    return updated;
   }
 }

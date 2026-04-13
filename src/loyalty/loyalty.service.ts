@@ -8,6 +8,7 @@ import {
   LoyaltyTransactionType,
   UserRole,
 } from '../common/constants/domain-enums';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AdjustLoyaltyPointsDto } from './dto/adjust-loyalty-points.dto';
 import { RedeemRewardDto } from './dto/redeem-reward.dto';
@@ -25,16 +26,42 @@ export class LoyaltyService {
 
   constructor(private readonly prisma: PrismaService) {}
 
+  private async getOrCreateLoyaltyAccount(
+    tx: Prisma.TransactionClient,
+    userId: string,
+  ) {
+    try {
+      return await tx.loyaltyAccount.upsert({
+        where: { userId },
+        update: {},
+        create: { userId },
+      });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError
+        && error.code === 'P2002'
+      ) {
+        const existing = await tx.loyaltyAccount.findUnique({
+          where: { userId },
+        });
+
+        if (existing) {
+          return existing;
+        }
+      }
+
+      throw error;
+    }
+  }
+
   private normalizePointsFromTotal(total: number): number {
     return Math.max(1, Math.floor(total * this.pointsPerCurrencyUnit));
   }
 
   async getMyLoyalty(userId: string) {
-    const account = await this.prisma.loyaltyAccount.upsert({
-      where: { userId },
-      update: {},
-      create: { userId },
-    });
+    const account = await this.prisma.$transaction((tx) =>
+      this.getOrCreateLoyaltyAccount(tx, userId),
+    );
 
     const transactions = await this.prisma.loyaltyTransaction.findMany({
       where: { accountId: account.id },
@@ -52,11 +79,7 @@ export class LoyaltyService {
 
   async redeemReward(userId: string, dto: RedeemRewardDto) {
     return this.prisma.$transaction(async (tx) => {
-      const account = await tx.loyaltyAccount.upsert({
-        where: { userId },
-        update: {},
-        create: { userId },
-      });
+      const account = await this.getOrCreateLoyaltyAccount(tx, userId);
 
       const requiredPoints = this.rewardCostPoints * dto.quantity;
       if (account.points < requiredPoints) {
@@ -100,11 +123,7 @@ export class LoyaltyService {
     }
 
     return this.prisma.$transaction(async (tx) => {
-      const account = await tx.loyaltyAccount.upsert({
-        where: { userId: dto.userId },
-        update: {},
-        create: { userId: dto.userId },
-      });
+      const account = await this.getOrCreateLoyaltyAccount(tx, dto.userId);
 
       const nextPoints = account.points + dto.pointsDelta;
       if (nextPoints < 0) {
@@ -157,11 +176,10 @@ export class LoyaltyService {
         return;
       }
 
-      const account = await tx.loyaltyAccount.upsert({
-        where: { userId: event.loyalty.userId },
-        update: {},
-        create: { userId: event.loyalty.userId },
-      });
+      const account = await this.getOrCreateLoyaltyAccount(
+        tx,
+        event.loyalty.userId,
+      );
 
       const earned = this.normalizePointsFromTotal(event.loyalty.amount);
       let updated = await tx.loyaltyAccount.update({

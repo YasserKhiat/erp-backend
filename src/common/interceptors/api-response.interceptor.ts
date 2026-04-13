@@ -3,6 +3,7 @@ import {
   ExecutionContext,
   Injectable,
   NestInterceptor,
+  StreamableFile,
 } from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
@@ -25,6 +26,13 @@ export class ApiResponseInterceptor implements NestInterceptor {
   ): Observable<unknown> {
     return next.handle().pipe(
       map((payload: unknown) => {
+        if (
+          payload instanceof StreamableFile
+          || this.isStreamableFileLike(payload)
+        ) {
+          return payload;
+        }
+
         if (
           payload &&
           typeof payload === 'object' &&
@@ -66,6 +74,18 @@ export class ApiResponseInterceptor implements NestInterceptor {
       typeof meta.page === 'number' &&
       typeof meta.limit === 'number' &&
       typeof meta.total === 'number'
+    );
+  }
+
+  private isStreamableFileLike(payload: unknown): boolean {
+    if (!payload || typeof payload !== 'object') {
+      return false;
+    }
+
+    const candidate = payload as Record<string, unknown>;
+    return (
+      typeof candidate.getStream === 'function'
+      && typeof candidate.getHeaders === 'function'
     );
   }
 }

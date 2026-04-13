@@ -100,6 +100,18 @@ export interface ReservationCreatedEvent {
   };
 }
 
+export interface ReservationStatusUpdatedEvent {
+  reservation: {
+    id: string;
+    userId?: string;
+    tableId: string;
+    previousStatus: string;
+    nextStatus: string;
+    startAt: string;
+    endAt: string;
+  };
+}
+
 export interface LoyaltyUpdatedEvent {
   loyalty: {
     orderId: string;

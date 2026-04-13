@@ -3,10 +3,12 @@ import {
   Controller,
   Delete,
   Get,
+  Header,
   Param,
   Patch,
   Post,
   Query,
+  StreamableFile,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -21,10 +23,11 @@ import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { paginateArray } from '../common/utils/pagination';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
-import { UserRole } from '../common/constants/domain-enums';
+import { OrderStatus, OrderType, UserRole } from '../common/constants/domain-enums';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
 import { AddCartItemDto } from './dto/add-cart-item.dto';
+import { OrdersQueryDto } from './dto/orders-query.dto';
 import { PlaceOrderDto } from './dto/place-order.dto';
 import { RemoveOrderItemDto } from './dto/remove-order-item.dto';
 import { UpdateCartItemDto } from './dto/update-cart-item.dto';
@@ -153,9 +156,10 @@ export class OrdersController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.EMPLOYEE)
   updateStatus(
     @Param('orderId') orderId: string,
+    @CurrentUser() user: { id: string },
     @Body() dto: UpdateOrderStatusDto,
   ) {
-    return this.ordersService.updateOrderStatus(orderId, dto);
+    return this.ordersService.updateOrderStatus(orderId, dto, user.id);
   }
 
   @Patch(':orderId/items/:orderItemId')
@@ -184,5 +188,28 @@ export class OrdersController {
     @Body() dto: RemoveOrderItemDto,
   ) {
     return this.ordersService.removeOrderItem(orderId, orderItemId, dto);
+  }
+
+  @Get(':orderId/invoice')
+  @ApiOperation({ summary: 'Get invoice details for one order' })
+  @ApiContractOk({ description: 'Invoice details payload.', dataSchema: { type: 'object' } })
+  getOrderInvoice(
+    @Param('orderId') orderId: string,
+    @CurrentUser() user: { id: string; role: UserRole },
+  ) {
+    return this.ordersService.getOrderInvoice(orderId, user);
+  }
+
+  @Get(':orderId/invoice/pdf')
+  @ApiOperation({ summary: 'Download invoice PDF for one order' })
+  @ApiContractOk({ description: 'Invoice PDF file.', dataSchema: { type: 'string', format: 'binary' } })
+  @Header('Content-Type', 'application/pdf')
+  @Header('Content-Disposition', 'attachment; filename="invoice.pdf"')
+  async getOrderInvoicePdf(
+    @Param('orderId') orderId: string,
+    @CurrentUser() user: { id: string; role: UserRole },
+  ) {
+    const pdf = await this.ordersService.getOrderInvoicePdf(orderId, user);
+    return new StreamableFile(pdf);
   }
 }

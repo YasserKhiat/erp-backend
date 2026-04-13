@@ -123,8 +123,9 @@ export class ReservationsController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.EMPLOYEE)
   updateStatus(
     @Param('reservationId') reservationId: string,
+    @CurrentUser() user: { id: string },
     @Body() dto: UpdateReservationStatusDto,
   ) {
-    return this.reservationsService.updateReservationStatus(reservationId, dto);
+    return this.reservationsService.updateReservationStatus(reservationId, dto, user.id);
   }
 }
