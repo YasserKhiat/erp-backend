@@ -1,11 +1,15 @@
 import { INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import * as bcrypt from 'bcrypt';
-import request = require('supertest');
 import { AppModule } from '../src/app.module';
 import { NotificationsRealtimeService } from '../src/notifications/notifications-realtime.service';
 import { NotificationsService } from '../src/notifications/notifications.service';
 import { PrismaService } from '../src/prisma/prisma.service';
+
+const request = require('supertest');
+
+process.env.JWT_SECRET ??= 'e2e-jwt-secret';
+process.env.JWT_EXPIRES_IN ??= '1d';
 
 jest.setTimeout(30_000);
 
