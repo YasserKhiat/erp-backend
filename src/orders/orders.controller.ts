@@ -3,10 +3,12 @@ import {
   Controller,
   Delete,
   Get,
+  Header,
   Param,
   Patch,
   Post,
   Query,
+  StreamableFile,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -143,9 +145,10 @@ export class OrdersController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.EMPLOYEE)
   updateStatus(
     @Param('orderId') orderId: string,
+    @CurrentUser() user: { id: string },
     @Body() dto: UpdateOrderStatusDto,
   ) {
-    return this.ordersService.updateOrderStatus(orderId, dto);
+    return this.ordersService.updateOrderStatus(orderId, dto, user.id);
   }
 
   @Patch(':orderId/items/:orderItemId')
@@ -174,5 +177,28 @@ export class OrdersController {
     @Body() dto: RemoveOrderItemDto,
   ) {
     return this.ordersService.removeOrderItem(orderId, orderItemId, dto);
+  }
+
+  @Get(':orderId/invoice')
+  @ApiOperation({ summary: 'Get invoice details for one order' })
+  @ApiContractOk({ description: 'Invoice details payload.', dataSchema: { type: 'object' } })
+  getOrderInvoice(
+    @Param('orderId') orderId: string,
+    @CurrentUser() user: { id: string; role: UserRole },
+  ) {
+    return this.ordersService.getOrderInvoice(orderId, user);
+  }
+
+  @Get(':orderId/invoice/pdf')
+  @ApiOperation({ summary: 'Download invoice PDF for one order' })
+  @ApiContractOk({ description: 'Invoice PDF file.', dataSchema: { type: 'string', format: 'binary' } })
+  @Header('Content-Type', 'application/pdf')
+  @Header('Content-Disposition', 'attachment; filename="invoice.pdf"')
+  async getOrderInvoicePdf(
+    @Param('orderId') orderId: string,
+    @CurrentUser() user: { id: string; role: UserRole },
+  ) {
+    const pdf = await this.ordersService.getOrderInvoicePdf(orderId, user);
+    return new StreamableFile(pdf);
   }
 }

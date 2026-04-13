@@ -1,4 +1,5 @@
 import 'reflect-metadata';
+import helmet from 'helmet';
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
@@ -8,6 +9,13 @@ import { ApiResponseInterceptor } from './common/interceptors/api-response.inter
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+
+  app.use(
+    helmet({
+      crossOriginResourcePolicy: false,
+      contentSecurityPolicy: false,
+    }),
+  );
 
   const allowedOrigins = (process.env.FRONTEND_ORIGINS
     ?? 'http://localhost:5173,http://localhost:5174,http://localhost:3001,http://localhost:4173')

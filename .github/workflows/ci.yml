@@ -26,6 +26,27 @@ jobs:
     name: CI / Build & Quality
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: erp_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d erp_ci"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/erp_ci?schema=public
+      JWT_SECRET: ci-jwt-secret
+      JWT_EXPIRES_IN: 1d
+      CLOUDINARY_CLOUD_NAME: ci-cloud
+      CLOUDINARY_API_KEY: ci-key
+      CLOUDINARY_API_SECRET: ci-secret
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -41,6 +62,9 @@ jobs:
 
       - name: Generate Prisma Client
         run: npm run prisma:generate
+
+      - name: Run Prisma Migrations
+        run: npm run prisma:deploy
 
       - name: Lint
         run: npm run lint

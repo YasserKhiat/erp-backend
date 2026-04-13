@@ -6,6 +6,7 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { ApiContractErrors, ApiContractOk } from '../common/swagger/api-contract.decorators';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
@@ -18,6 +19,7 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('register')
+  @Throttle({ default: { ttl: 60_000, limit: 8 } })
   @ApiOperation({
     summary: 'Register a new user',
     description: 'Creates a user account and returns JWT access token.',
@@ -47,6 +49,7 @@ export class AuthController {
   }
 
   @Post('login')
+  @Throttle({ default: { ttl: 60_000, limit: 10 } })
   @HttpCode(200)
   @ApiOperation({
     summary: 'Login with email and password',
