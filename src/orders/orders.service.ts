@@ -23,6 +23,7 @@ import { RemoveOrderItemDto } from './dto/remove-order-item.dto';
 import { UpdateCartItemDto } from './dto/update-cart-item.dto';
 import { UpdateOrderItemDto } from './dto/update-order-item.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
+import { OrdersQueryDto } from './dto/orders-query.dto';
 import {
   OrderCancelledEvent,
   OrderConfirmedEvent,
@@ -536,6 +537,67 @@ export class OrdersService {
       },
       orderBy: { createdAt: 'desc' },
     });
+  }
+
+  async listBackofficeOrders(query: OrdersQueryDto) {
+    const { page = 1, limit = 10, status, orderType, search } = query;
+    const skip = (page - 1) * limit;
+
+    const where: Prisma.OrderWhereInput = {};
+
+    if (status) {
+      where.status = status;
+    }
+    if (orderType) {
+      where.orderType = orderType;
+    }
+
+    if (search) {
+      const searchNum = parseInt(search, 10);
+      where.OR = [
+        ...(isNaN(searchNum) ? [] : [{ orderNumber: searchNum }]),
+        {
+          customer: {
+            OR: [
+              { email: { contains: search, mode: 'insensitive' as Prisma.QueryMode } },
+              { fullName: { contains: search, mode: 'insensitive' as Prisma.QueryMode } },
+            ],
+          },
+        },
+      ];
+      // Since order ID is string UUID, we can also search if it matches a UUID format, but typically string contains works
+      where.OR.push({ id: { contains: search, mode: 'insensitive' as Prisma.QueryMode } });
+    }
+
+    const [total, items] = await this.prisma.$transaction([
+      this.prisma.order.count({ where }),
+      this.prisma.order.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          customer: {
+            select: { id: true, email: true, fullName: true },
+          },
+          table: {
+            select: { id: true, code: true },
+          },
+          items: {
+            include: { menuItem: true }
+          }
+        },
+      }),
+    ]);
+
+    return {
+      data: items,
+      meta: {
+        page,
+        limit,
+        total,
+      },
+    };
   }
 
   async getOrder(orderId: string, user?: { id: string; role: UserRole }) {

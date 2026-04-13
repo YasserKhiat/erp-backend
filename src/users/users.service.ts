@@ -3,8 +3,10 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
 import { UserRole } from '../common/constants/domain-enums';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import { CreateClientAddressDto } from './dto/create-client-address.dto';
 import { UpdateClientPreferencesDto } from './dto/update-client-preferences.dto';
 
@@ -40,6 +42,43 @@ export class UsersService {
       throw new NotFoundException('User not found');
     }
     return user;
+  }
+
+  async changeOwnPassword(userId: string, dto: ChangePasswordDto) {
+    if (dto.currentPassword === dto.newPassword) {
+      throw new BadRequestException('NEW_PASSWORD_MUST_BE_DIFFERENT');
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, passwordHash: true },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const isValidCurrentPassword = await bcrypt.compare(
+      dto.currentPassword,
+      user.passwordHash,
+    );
+
+    if (!isValidCurrentPassword) {
+      throw new BadRequestException('INVALID_CURRENT_PASSWORD');
+    }
+
+    const nextPasswordHash = await bcrypt.hash(dto.newPassword, 10);
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { passwordHash: nextPasswordHash },
+    });
+
+    return {
+      success: true,
+      data: null,
+      message: 'Password updated successfully',
+    };
   }
 
   async listAddresses(userId: string) {

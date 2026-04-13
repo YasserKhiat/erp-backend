@@ -1,0 +1,9 @@
+favorites 400 BAD_REQUEST
+inventory_create 400 VALIDATION_ERROR initialStock must not be less than 0
+inventory_movement 201 OK
+loyalty_adjust 201 OK
+cart_add 201 OK
+order_create 409 MISSING_RECIPE
+daily_revenue_before_after 0 0
+reservation_conflict 409 409 RESERVATION_SLOT_CONFLICT
+forbidden_code FORBIDDEN_ROLE

@@ -30,6 +30,7 @@ import { RemoveOrderItemDto } from './dto/remove-order-item.dto';
 import { UpdateCartItemDto } from './dto/update-cart-item.dto';
 import { UpdateOrderItemDto } from './dto/update-order-item.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
+import { OrdersQueryDto } from './dto/orders-query.dto';
 import {
   ApiContractErrors,
   ApiContractListOk,
@@ -99,6 +100,15 @@ export class OrdersController {
     @Body() dto: PlaceOrderDto,
   ) {
     return this.ordersService.placeOrder(user, dto);
+  }
+
+  @Get()
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.EMPLOYEE)
+  @ApiOperation({ summary: 'List backoffice global orders' })
+  @ApiContractListOk({ description: 'Paginated list of global backoffice orders.' })
+  listOrders(@Query() query: OrdersQueryDto) {
+    return this.ordersService.listBackofficeOrders(query);
   }
 
   @Get('history')
